@@ -1,6 +1,9 @@
 import { initializeApp, getApps, getApp } from 'firebase/app';
 import { 
-  getFirestore, 
+  getFirestore,
+  initializeFirestore, 
+  persistentLocalCache,
+  persistentMultipleTabManager,
   collection, 
   doc, 
   setDoc, 
@@ -11,11 +14,31 @@ import {
   writeBatch 
 } from 'firebase/firestore';
 import firebaseConfig from '../../firebase-applet-config.json';
-import { PullRecord, BlitzRecord, PNCRecord, Report030519Item, ProductCatalogItem, UserAccount } from '../types';
+import { PullRecord, BlitzRecord, PNCRecord, Report030519Item, ProductCatalogItem, UserAccount, SupplierItem } from '../types';
+import { INITIAL_SUPPLIERS } from '../data/initialSuppliers';
 
 // Initialize Firebase App instance safely (singleton pattern)
 const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
-export const db = getFirestore(app, firebaseConfig.firestoreDatabaseId || undefined);
+
+function getOrCreateFirestore() {
+  const dbId = firebaseConfig.firestoreDatabaseId || undefined;
+  try {
+    return initializeFirestore(app, {
+      experimentalAutoDetectLongPolling: true,
+      localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() })
+    }, dbId);
+  } catch (err) {
+    try {
+      return initializeFirestore(app, {
+        experimentalAutoDetectLongPolling: true,
+      }, dbId);
+    } catch {
+      return getFirestore(app, dbId);
+    }
+  }
+}
+
+export const db = getOrCreateFirestore();
 
 // Collection Names in Firestore
 export const COLLECTIONS = {
@@ -25,7 +48,8 @@ export const COLLECTIONS = {
   REPORT_030519: 'nri_report_030519',
   CATALOG: 'nri_product_catalog',
   BRANDING: 'nri_branding_settings',
-  USERS: 'nri_users'
+  USERS: 'nri_users',
+  SUPPLIERS: 'nri_suppliers'
 } as const;
 
 // LocalStorage Cache Keys
@@ -35,7 +59,8 @@ export const CACHE_KEYS = {
   PNCS: 'nri_cached_pncs',
   REPORT_030519: 'nri_cached_report030519',
   CATALOG: 'nri_cached_catalog',
-  USERS: 'nri_cached_users'
+  USERS: 'nri_cached_users',
+  SUPPLIERS: 'nri_cached_suppliers'
 } as const;
 
 // Cache Helper Functions
@@ -291,6 +316,33 @@ export async function saveCatalogItemToFirestore(item: ProductCatalogItem): Prom
   }
 }
 
+export async function deleteCatalogItemFromFirestore(code: string): Promise<void> {
+  const existing = getCachedData<ProductCatalogItem[]>(CACHE_KEYS.CATALOG, []);
+  setCachedData(CACHE_KEYS.CATALOG, existing.filter(c => c.code !== code));
+
+  try {
+    const ref = doc(db, COLLECTIONS.CATALOG, `prod-${code}`);
+    await deleteDoc(ref);
+  } catch (err) {
+    console.error('Error deleting Catalog item from Firestore:', err);
+  }
+}
+
+export async function saveCatalogToFirestore(items: ProductCatalogItem[]): Promise<void> {
+  setCachedData(CACHE_KEYS.CATALOG, items);
+
+  try {
+    const batch = writeBatch(db);
+    for (const it of items) {
+      const ref = doc(db, COLLECTIONS.CATALOG, `prod-${it.code}`);
+      batch.set(ref, it, { merge: true });
+    }
+    await batch.commit();
+  } catch (err) {
+    console.error('Error writing Catalog list to Firestore:', err);
+  }
+}
+
 export async function clearCollectionInFirestore(collectionName: string): Promise<void> {
   if (collectionName === COLLECTIONS.PULLS) setCachedData(CACHE_KEYS.PULLS, []);
   if (collectionName === COLLECTIONS.BLITZ) setCachedData(CACHE_KEYS.BLITZ, []);
@@ -393,3 +445,122 @@ export async function deleteUserFromFirestore(userId: string): Promise<void> {
   const userRef = doc(db, COLLECTIONS.USERS, userId);
   await deleteDoc(userRef);
 }
+
+// ==========================================
+// SUPPLIERS & FACTORIES FIRESTORE INTEGRATION
+// ==========================================
+let hasLoadedSuppliersOnce = false;
+
+export function subscribeToSuppliers(onUpdate: (suppliers: SupplierItem[]) => void) {
+  const cached = getCachedData<SupplierItem[]>(CACHE_KEYS.SUPPLIERS, INITIAL_SUPPLIERS);
+  if (cached && cached.length > 0) {
+    onUpdate(cached);
+  }
+
+  const suppliersRef = collection(db, COLLECTIONS.SUPPLIERS);
+  return onSnapshot(suppliersRef, async (snapshot) => {
+    if (snapshot.empty && !hasLoadedSuppliersOnce) {
+      hasLoadedSuppliersOnce = true;
+      // Seed initial 29 suppliers if Firestore collection is brand new
+      try {
+        const batch = writeBatch(db);
+        for (const s of INITIAL_SUPPLIERS) {
+          const docRef = doc(db, COLLECTIONS.SUPPLIERS, s.id);
+          batch.set(docRef, s);
+        }
+        await batch.commit();
+      } catch (err) {
+        console.warn('Could not seed initial suppliers to Firestore:', err);
+      }
+      setCachedData(CACHE_KEYS.SUPPLIERS, INITIAL_SUPPLIERS);
+      onUpdate(INITIAL_SUPPLIERS);
+      return;
+    }
+
+    hasLoadedSuppliersOnce = true;
+    const list: SupplierItem[] = [];
+    snapshot.forEach((docSnap) => {
+      list.push(docSnap.data() as SupplierItem);
+    });
+
+    list.sort((a, b) => a.name.localeCompare(b.name));
+    if (list.length > 0) {
+      setCachedData(CACHE_KEYS.SUPPLIERS, list);
+    }
+    onUpdate(list);
+  }, (error) => {
+    console.error('Error listening to suppliers in Firestore, falling back to cache:', error);
+    onUpdate(getCachedData<SupplierItem[]>(CACHE_KEYS.SUPPLIERS, INITIAL_SUPPLIERS));
+  });
+}
+
+export async function saveSupplierToFirestore(supplier: SupplierItem): Promise<void> {
+  const existing = getCachedData<SupplierItem[]>(CACHE_KEYS.SUPPLIERS, INITIAL_SUPPLIERS);
+  const idx = existing.findIndex(s => s.id === supplier.id);
+  const updated = idx >= 0 ? [...existing] : [...existing, supplier];
+  if (idx >= 0) updated[idx] = supplier;
+  setCachedData(CACHE_KEYS.SUPPLIERS, updated);
+
+  try {
+    const ref = doc(db, COLLECTIONS.SUPPLIERS, supplier.id);
+    await setDoc(ref, supplier, { merge: true });
+  } catch (err) {
+    console.error('Error writing Supplier to Firestore:', err);
+  }
+}
+
+export async function deleteSupplierFromFirestore(supplierId: string): Promise<void> {
+  const existing = getCachedData<SupplierItem[]>(CACHE_KEYS.SUPPLIERS, INITIAL_SUPPLIERS);
+  const filtered = existing.filter(s => s.id !== supplierId);
+  setCachedData(CACHE_KEYS.SUPPLIERS, filtered);
+
+  try {
+    const ref = doc(db, COLLECTIONS.SUPPLIERS, supplierId);
+    await deleteDoc(ref);
+  } catch (err) {
+    console.error('Error deleting Supplier from Firestore:', err);
+  }
+}
+
+export async function resetSuppliersToDefault(): Promise<void> {
+  setCachedData(CACHE_KEYS.SUPPLIERS, INITIAL_SUPPLIERS);
+  try {
+    const colRef = collection(db, COLLECTIONS.SUPPLIERS);
+    const snapshot = await getDocs(colRef);
+    const batch = writeBatch(db);
+    snapshot.forEach(d => batch.delete(d.ref));
+    for (const s of INITIAL_SUPPLIERS) {
+      const docRef = doc(db, COLLECTIONS.SUPPLIERS, s.id);
+      batch.set(docRef, s);
+    }
+    await batch.commit();
+  } catch (err) {
+    console.error('Error resetting suppliers in Firestore:', err);
+  }
+}
+
+// ==========================================
+// BRANDING SETTINGS FIRESTORE INTEGRATION
+// ==========================================
+export function subscribeToBrandSettings(onUpdate: (brand: any) => void) {
+  const brandingRef = doc(db, COLLECTIONS.BRANDING, 'main');
+  return onSnapshot(brandingRef, (docSnap) => {
+    if (docSnap.exists()) {
+      const data = docSnap.data();
+      onUpdate(data);
+    }
+  }, (error) => {
+    console.warn('Error listening to branding in Firestore:', error);
+  });
+}
+
+export async function saveBrandSettingsToFirestore(brandSettings: any): Promise<void> {
+  try {
+    const brandingRef = doc(db, COLLECTIONS.BRANDING, 'main');
+    await setDoc(brandingRef, brandSettings, { merge: true });
+  } catch (err) {
+    console.error('Error writing branding to Firestore:', err);
+  }
+}
+
+

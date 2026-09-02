@@ -31,15 +31,31 @@ export interface UserAccount {
   active: boolean;
 }
 
+export type SupplierType = 'FÁBRICA' | 'FORNECEDOR' | 'DISTRIBUIDOR' | 'CLIENTE / DEVOLUÇÃO' | 'OUTRO';
+
+export interface SupplierItem {
+  id: string;
+  code: string;
+  name: string;
+  type: SupplierType;
+  location?: string;
+  active: boolean;
+  notes?: string;
+  createdAt?: string;
+}
+
 export interface ProductCatalogItem {
   code: string;
   description: string;
   unit: string;
   category: string;
   price: number;
+  unitPrice?: number;
   hectoliterFactor: number;
   palletFactor: number; // e.g. 84, 90, 100, 150
   lastroFactor: number;  // e.g. 12, 14, 15, 20
+  factorSKU?: number;
+  packaging?: string;
   abcClass: ABCClass;
   rank?: number;
   defaultShelfLifeDays?: number; // e.g. 180, 270, 365
@@ -78,6 +94,10 @@ export interface NRIItem {
   hasRunoffRisk?: boolean;           // true se neededRunoffDays > prazo útil de validade
   isUnder60Days?: boolean;           // true se dias restantes <= 60 dias
   validityAlertObservation?: string; // Observação explicativa do alerta de validade / escoamento
+  // Stock Age Index (%) = (Dias Restantes ÷ Idade do Produto) × 100
+  productShelfLifeDays?: number;     // Idade total do produto (Shelf-Life total em dias, ex: 180, 270, 365)
+  stockAgeIndex?: number;            // Stock Age Index (%)
+  saiClassification?: 'CRÍTICO' | 'ATENÇÃO' | 'OK'; // Crítico (<60%), Atenção (60%-75%), OK (>75%)
 }
 
 export interface NRIPullHeader {

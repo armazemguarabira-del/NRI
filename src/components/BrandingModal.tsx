@@ -19,6 +19,7 @@ import {
   resetBrandSettings,
   DEFAULT_BRAND_SETTINGS 
 } from '../utils/branding';
+import { saveBrandSettingsToFirestore } from '../services/firebase';
 import { PauBrasilLogo } from './PauBrasilLogo';
 
 interface BrandingModalProps {
@@ -54,10 +55,12 @@ export const BrandingModal: React.FC<BrandingModalProps> = ({ isOpen, onClose })
         const updated = { ...settings, primaryLogoUrl: dataUrl };
         setSettings(updated);
         saveStoredBrandSettings(updated);
+        saveBrandSettingsToFirestore(updated).catch(err => console.error('Firestore brand sync error:', err));
       } else {
         const updated = { ...settings, secondaryLogoUrl: dataUrl };
         setSettings(updated);
         saveStoredBrandSettings(updated);
+        saveBrandSettingsToFirestore(updated).catch(err => console.error('Firestore brand sync error:', err));
       }
       setSaveSuccess(true);
       setTimeout(() => setSaveSuccess(false), 2500);
@@ -69,16 +72,19 @@ export const BrandingModal: React.FC<BrandingModalProps> = ({ isOpen, onClose })
     const updated = { ...settings, primaryLogoUrl: null };
     setSettings(updated);
     saveStoredBrandSettings(updated);
+    saveBrandSettingsToFirestore(updated).catch(err => console.error('Firestore brand sync error:', err));
   };
 
   const handleRemoveSecondaryLogo = () => {
     const updated = { ...settings, secondaryLogoUrl: null };
     setSettings(updated);
     saveStoredBrandSettings(updated);
+    saveBrandSettingsToFirestore(updated).catch(err => console.error('Firestore brand sync error:', err));
   };
 
   const handleSaveTextChanges = () => {
     saveStoredBrandSettings(settings);
+    saveBrandSettingsToFirestore(settings).catch(err => console.error('Firestore brand sync error:', err));
     setSaveSuccess(true);
     setTimeout(() => setSaveSuccess(false), 2000);
   };
@@ -87,6 +93,7 @@ export const BrandingModal: React.FC<BrandingModalProps> = ({ isOpen, onClose })
     if (window.confirm('Deseja restaurar todas as configurações de logotipo e textos para o padrão original?')) {
       const reset = resetBrandSettings();
       setSettings(reset);
+      saveBrandSettingsToFirestore(reset).catch(err => console.error('Firestore brand sync error:', err));
       setSaveSuccess(true);
       setTimeout(() => setSaveSuccess(false), 2000);
     }

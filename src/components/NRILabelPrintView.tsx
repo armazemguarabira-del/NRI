@@ -1,14 +1,17 @@
 import React, { useState, useEffect } from 'react';
-import { Printer, ArrowLeft, Layers, Filter, CheckCircle2, Image as ImageIcon, LayoutGrid } from 'lucide-react';
-import { PullRecord, NRIItem } from '../types';
-import { formatDateBR, getAbcBadgeColor } from '../utils/nriCalculations';
+import { Printer, ArrowLeft, Layers, Filter, CheckCircle2, Image as ImageIcon, LayoutGrid, ExternalLink } from 'lucide-react';
+import { PullRecord, NRIItem, ProductCatalogItem } from '../types';
+import { formatDateBR, getAbcBadgeColor, subtractDaysFromDate } from '../utils/nriCalculations';
 import { PauBrasilLogo } from './PauBrasilLogo';
 import { getStoredBrandSettings, BrandSettings } from '../utils/branding';
 import { BrandingModal } from './BrandingModal';
+import { INITIAL_PRODUCTS } from '../data/initialCatalog';
+import { executePrintJob } from '../utils/printHelper';
 
 interface NRILabelPrintViewProps {
   currentPull?: PullRecord | null;
   pull?: PullRecord | null;
+  catalog?: ProductCatalogItem[];
   onBackToForm?: () => void;
   onBack?: () => void;
   onOpenBrandingModal?: () => void;
@@ -23,6 +26,8 @@ interface PrintablePalletFace {
   faceNumber: 1 | 2 | 3 | 4;
   faceLabel: string;
   quantityInPallet: number;
+  palletFactor: number;
+  lastroFactor: number;
   isFractionalLastro: boolean;
 }
 
@@ -36,6 +41,7 @@ const FACE_DESCRIPTIONS: Record<number, string> = {
 export const NRILabelPrintView: React.FC<NRILabelPrintViewProps> = ({
   currentPull: propCurrentPull,
   pull: propPull,
+  catalog,
   onBackToForm,
   onBack,
   onOpenBrandingModal
@@ -91,13 +97,26 @@ export const NRILabelPrintView: React.FC<NRILabelPrintViewProps> = ({
       return;
     }
 
+    // Lookup product catalog registration for exact standard Pallet and Lastro factor
+    const catalogItem = (catalog && catalog.find(c => String(c.code).trim() === String(item.productCode).trim()))
+      || INITIAL_PRODUCTS.find(c => String(c.code).trim() === String(item.productCode).trim());
+
+    // Exact registered factors from catalog, or 0 if missing (will display CADASTRAR)
+    const registeredPalletFactor = (catalogItem && catalogItem.palletFactor && catalogItem.palletFactor > 0)
+      ? catalogItem.palletFactor
+      : 0;
+
+    const registeredLastroFactor = (catalogItem && catalogItem.lastroFactor && catalogItem.lastroFactor > 0)
+      ? catalogItem.lastroFactor
+      : 0;
+
     const wholePallets = Math.floor(item.palletCount);
     const fractionalPart = item.palletCount - wholePallets;
     const itemTotalPalletUnits = Math.max(1, Math.ceil(item.palletCount));
 
-    const qtyPerPallet = item.quantitySku > 0 && item.palletCount > 0 
-      ? Math.round(item.quantitySku / item.palletCount) 
-      : item.quantitySku || 100;
+    const qtyPerPallet = registeredPalletFactor > 0
+      ? registeredPalletFactor
+      : (item.quantitySku > 0 && item.palletCount > 0 ? Math.round(item.quantitySku / item.palletCount) : item.quantitySku || 0);
 
     // If wholePallets is 0 and fractionalPart is 0 (or item.palletCount <= 0), treat as 1 pallet
     if (wholePallets <= 0 && fractionalPart <= 0) {
@@ -111,7 +130,9 @@ export const NRILabelPrintView: React.FC<NRILabelPrintViewProps> = ({
           totalGlobalPallets: totalPalletsInPull,
           faceNumber: f as 1 | 2 | 3 | 4,
           faceLabel: FACE_DESCRIPTIONS[f],
-          quantityInPallet: item.quantitySku,
+          quantityInPallet: item.quantitySku || qtyPerPallet,
+          palletFactor: registeredPalletFactor,
+          lastroFactor: registeredLastroFactor,
           isFractionalLastro: false
         });
       }
@@ -131,16 +152,22 @@ export const NRILabelPrintView: React.FC<NRILabelPrintViewProps> = ({
           faceNumber: f as 1 | 2 | 3 | 4,
           faceLabel: FACE_DESCRIPTIONS[f],
           quantityInPallet: qtyPerPallet,
+          palletFactor: registeredPalletFactor,
+          lastroFactor: registeredLastroFactor,
           isFractionalLastro: false
         });
       }
       globalPalletCounter++;
     }
 
-    // Fractional pallet (Lastro fraction)
+    // Fractional pallet (Pallet Falho: 1 falho = 4 labels with 100% of all information)
     if (fractionalPart > 0) {
-      const remainingSku = item.quantitySku - (wholePallets * qtyPerPallet);
+      const remainingSku = item.quantitySku > 0 && wholePallets > 0
+        ? (item.quantitySku - (wholePallets * (qtyPerPallet || 1)))
+        : (item.quantitySku || Math.round(qtyPerPallet * fractionalPart));
+      const falhoQty = remainingSku > 0 ? remainingSku : Math.round(qtyPerPallet * fractionalPart) || item.quantitySku || qtyPerPallet;
       const currentGlobalIdx = item.palletNumber ? item.palletNumber : globalPalletCounter;
+
       for (let f = 1; f <= facesPerPallet; f++) {
         printableList.push({
           item,
@@ -149,8 +176,10 @@ export const NRILabelPrintView: React.FC<NRILabelPrintViewProps> = ({
           globalPalletIndex: currentGlobalIdx,
           totalGlobalPallets: totalPalletsInPull,
           faceNumber: f as 1 | 2 | 3 | 4,
-          faceLabel: `${FACE_DESCRIPTIONS[f]} (FRAÇÃO / LASTRO)`,
-          quantityInPallet: remainingSku > 0 ? remainingSku : Math.round(item.quantitySku * fractionalPart),
+          faceLabel: `${FACE_DESCRIPTIONS[f]} (FALHO / FRAÇÃO)`,
+          quantityInPallet: falhoQty,
+          palletFactor: registeredPalletFactor,
+          lastroFactor: registeredLastroFactor,
           isFractionalLastro: true
         });
       }
@@ -166,8 +195,26 @@ export const NRILabelPrintView: React.FC<NRILabelPrintViewProps> = ({
   }
 
   const handlePrint = () => {
-    window.print();
+    try {
+      executePrintJob('printable-sheets-container', `Etiquetas_${currentPull.header.truckPlate || 'NRI'}_${currentPull.header.nfeNumber || 'Doc'}`);
+    } catch (err) {
+      console.warn('Execute print job error, calling direct fallback:', err);
+      window.focus();
+      window.print();
+    }
   };
+
+  // Keyboard shortcut Ctrl+P / Cmd+P
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === 'p') {
+        e.preventDefault();
+        handlePrint();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [currentPull]);
 
   return (
     <div className="max-w-7xl mx-auto p-4 sm:p-6 space-y-6">
@@ -253,7 +300,8 @@ export const NRILabelPrintView: React.FC<NRILabelPrintViewProps> = ({
 
           <button
             onClick={handlePrint}
-            className="flex items-center gap-2 px-6 py-2.5 bg-amber-500 hover:bg-amber-600 text-slate-950 font-black rounded-xl text-xs shadow-md transition-all active:scale-95 cursor-pointer"
+            className="flex items-center gap-2 px-6 py-2.5 bg-amber-500 hover:bg-amber-600 active:bg-amber-700 text-slate-950 font-black rounded-xl text-xs shadow-md hover:shadow-lg transition-all active:scale-95 cursor-pointer ring-2 ring-amber-400"
+            title="Abrir tela de impressão"
           >
             <Printer className="w-4 h-4 stroke-[2.5]" />
             <span>Imprimir {printableList.length} Etiqueta(s) ({pagedSheets.length} Folha(s))</span>
@@ -262,16 +310,19 @@ export const NRILabelPrintView: React.FC<NRILabelPrintViewProps> = ({
       </div>
 
       {/* Pages Render Container */}
-      <div className="flex flex-col items-center justify-center gap-8 print:gap-0 print:m-0 print:p-0">
+      <div 
+        id="printable-sheets-container" 
+        className="flex flex-col items-center justify-center gap-8 print:gap-0 print:m-0 print:p-0 w-full"
+      >
         {pagedSheets.map((sheet, sheetIdx) => (
           <div
             key={`sheet-${sheetIdx}`}
             className={
               printSize === 'a4_4_per_page'
-                ? "a4-print-sheet-4 w-[210mm] max-w-full bg-white p-3 print:p-0 border border-slate-300 print:border-none shadow-md print:shadow-none mb-6 print:mb-0 grid grid-cols-1 grid-rows-4 gap-2.5 h-[285mm]"
+                ? "a4-print-sheet-4 w-[202mm] max-w-full bg-white p-2 print:p-0 border border-slate-300 print:border-none shadow-md print:shadow-none mb-6 print:mb-0 grid grid-cols-1 grid-rows-4 gap-1.5 h-auto min-h-[280mm] max-h-none print:h-[280mm] print:max-h-[280mm] print:min-h-[280mm]"
                 : printSize === 'a4_double'
-                ? "a4-print-sheet-2 w-[210mm] max-w-full bg-white p-4 print:p-0 border border-slate-300 print:border-none shadow-md print:shadow-none mb-6 print:mb-0 grid grid-cols-1 grid-rows-2 gap-4 h-[285mm]"
-                : "a4-print-sheet-1 w-[210mm] max-w-full bg-white p-6 print:p-0 border border-slate-300 print:border-none shadow-md print:shadow-none mb-6 print:mb-0 flex flex-col justify-between h-[285mm]"
+                ? "a4-print-sheet-2 w-[202mm] max-w-full bg-white p-4 print:p-0 border border-slate-300 print:border-none shadow-md print:shadow-none mb-6 print:mb-0 grid grid-cols-1 grid-rows-2 gap-4 h-auto min-h-[280mm] print:h-[280mm] print:max-h-[280mm]"
+                : "a4-print-sheet-1 w-[202mm] max-w-full bg-white p-6 print:p-0 border border-slate-300 print:border-none shadow-md print:shadow-none mb-6 print:mb-0 flex flex-col justify-between h-auto min-h-[280mm] print:h-[280mm] print:max-h-[280mm]"
             }
             style={{
               fontFamily: "'Plus Jakarta Sans', Arial, sans-serif",
@@ -319,128 +370,181 @@ const LabelCard: React.FC<LabelCardProps> = ({ entry, currentPull, brand, varian
     faceNumber,
     faceLabel,
     quantityInPallet,
+    palletFactor,
+    lastroFactor,
     isFractionalLastro
   } = entry;
 
   const isCompact = variant === 'a4_4_per_page';
 
+  // Quantity to display in QTD TOTAL / PALLET:
+  // If full pallet: exact standard palletFactor from catalog (e.g. 286, 150, 160, 84, etc.)
+  // If fractional: actual remaining SKU units on that specific pallet
+  const displayQuantityTotal = isFractionalLastro 
+    ? quantityInPallet 
+    : (palletFactor && palletFactor > 0 ? palletFactor : 'CADASTRAR');
+
+  const displayQuantityLastro = (lastroFactor && lastroFactor > 0) 
+    ? lastroFactor 
+    : 'CADASTRAR';
+
   return (
     <div
       className={`bg-white text-black border-2 border-black font-sans box-border flex flex-col justify-between overflow-hidden ${
         isCompact 
-          ? 'p-2 h-full max-h-[68.5mm] rounded-none' 
+          ? 'p-1 sm:p-1.5 h-full max-h-[68mm] min-h-[64mm] print:h-[68mm] print:max-h-[68mm] print:min-h-[68mm] rounded-none' 
           : variant === 'a4_double'
-          ? 'p-4 h-full min-h-[135mm]'
+          ? 'p-4 h-full min-h-[130mm]'
           : 'p-6 h-full min-h-[265mm]'
       }`}
     >
-      {/* 1. TOP HEADER: Logo ambev (Blue) + PAU BRASIL GUARABIRA (Bold Blue) */}
-      <div className={`flex items-center justify-between border-b-2 border-black ${isCompact ? 'pb-1' : 'pb-2 mb-2'}`}>
-        <div className="flex items-center gap-1.5">
-          {brand.primaryLogoUrl ? (
+      {/* 1. TOP HEADER: AMBEV on the Left + PAU BRASIL GUARABIRA & LOGO on the Right */}
+      <div className={`flex items-center justify-between border-b-2 border-black ${isCompact ? 'pb-0.5 mb-0.5 min-h-[24px]' : 'pb-2 mb-2 min-h-[46px]'}`}>
+        {/* Left: AMBEV */}
+        <div className="flex items-center gap-1.5 shrink-0">
+          {brand.secondaryLogoUrl ? (
             <img 
-              src={brand.primaryLogoUrl} 
-              alt="Logo" 
-              className={isCompact ? "max-h-5 max-w-[80px] object-contain" : "max-h-8 max-w-[120px] object-contain"} 
+              src={brand.secondaryLogoUrl} 
+              alt="Ambev" 
+              className={isCompact ? "h-5 sm:h-5.5 max-h-6 max-w-[70px] object-contain" : "h-9 max-h-9 max-w-[120px] object-contain"} 
               referrerPolicy="no-referrer"
             />
           ) : (
-            <span className={`font-black tracking-tighter lowercase font-sans text-[#002B7F] ${isCompact ? 'text-xl' : 'text-3xl'}`}>
+            <span className={`font-black tracking-tight lowercase font-sans text-[#002B7F] ${isCompact ? 'text-xl sm:text-[22px] leading-none' : 'text-3xl sm:text-4xl leading-none'}`}>
               ambev
             </span>
           )}
         </div>
-        <div className="text-right">
-          <span className={`font-black uppercase tracking-tight text-[#002B7F] font-sans leading-none ${isCompact ? 'text-base sm:text-lg' : 'text-2xl sm:text-3xl'}`}>
+
+        {/* Right: PAU BRASIL GUARABIRA + LOGO */}
+        <div className="flex items-center gap-1.5 justify-end shrink-0 max-w-[75%]">
+          <span className={`font-black uppercase tracking-tight text-[#002B7F] font-sans leading-none truncate ${isCompact ? 'text-[11px] sm:text-xs md:text-[13px]' : 'text-2xl sm:text-3xl'}`}>
             {brand.companyName || 'PAU BRASIL GUARABIRA'}
           </span>
+          {brand.primaryLogoUrl ? (
+            <img 
+              src={brand.primaryLogoUrl} 
+              alt="Logo Pau Brasil" 
+              className={isCompact ? "h-5 sm:h-5.5 max-h-6 max-w-[70px] object-contain shrink-0" : "h-10 max-h-10 max-w-[120px] object-contain shrink-0"} 
+              referrerPolicy="no-referrer"
+            />
+          ) : (
+            <PauBrasilLogo size={isCompact ? "sm" : "md"} showText={false} className="shrink-0 scale-90 sm:scale-100" />
+          )}
         </div>
       </div>
 
       {/* 2. PRODUCT CODE & DESCRIPTION CENTERED */}
-      <div className={`text-center font-black uppercase text-black tracking-tight leading-tight truncate ${isCompact ? 'text-xs sm:text-sm my-0.5' : 'text-lg sm:text-xl my-2'}`}>
-        <span className="font-mono">{item.productCode}</span> - {item.description}
+      <div className={`text-center font-black uppercase text-black tracking-tight leading-tight px-0.5 truncate ${
+        isCompact 
+          ? 'text-[13px] sm:text-[14px] md:text-[15px] py-0 my-0' 
+          : variant === 'a4_double'
+          ? 'text-2xl sm:text-[28px] my-3'
+          : 'text-3xl sm:text-4xl my-4'
+      }`}>
+        <span className="font-mono font-black text-black tracking-normal">{item.productCode}</span> – {item.description}
       </div>
 
-      {/* 3. HERO SECTION: "Carreg até:" + BLACK BOX WITH LOAD DATE + CURVA BOX */}
-      <div className={`flex items-center justify-between gap-2.5 ${isCompact ? 'my-0.5' : 'my-2'}`}>
+      {/* 3. HERO SECTION: "Carreg até:" + GIANT BLACK BOX + CURVA ABC */}
+      <div className={`flex items-stretch justify-between gap-1 ${isCompact ? 'my-0.5' : 'my-2.5'}`}>
         {/* Left: Carreg até: */}
-        <div className={`text-right flex flex-col justify-center leading-tight shrink-0 ${isCompact ? 'min-w-[50px]' : 'min-w-[70px]'}`}>
-          <span className={`font-black uppercase text-black ${isCompact ? 'text-xs' : 'text-base'}`}>Carreg</span>
-          <span className={`font-black uppercase text-black ${isCompact ? 'text-xs' : 'text-base'}`}>até:</span>
+        <div className={`text-right flex flex-col justify-center leading-tight shrink-0 pr-1 ${isCompact ? 'min-w-[46px] sm:min-w-[52px]' : 'min-w-[85px]'}`}>
+          <span className={`font-black uppercase text-black leading-none ${isCompact ? 'text-[10px] sm:text-[11px]' : 'text-base sm:text-lg'}`}>Carreg</span>
+          <span className={`font-black uppercase text-black leading-none ${isCompact ? 'text-[10px] sm:text-[11px]' : 'text-base sm:text-lg'}`}>até:</span>
         </div>
 
         {/* Center: Giant Black Box with Load Until Date */}
-        <div className={`flex-1 bg-black text-white text-center flex items-center justify-center ${isCompact ? 'py-1 px-2' : 'py-3 px-4'}`}>
-          <span className={`font-black font-mono tracking-wider text-white ${isCompact ? 'text-2xl sm:text-3xl' : 'text-5xl sm:text-6xl'}`}>
+        <div className={`flex-1 bg-black text-white text-center flex items-center justify-center ${isCompact ? 'py-0.5 px-1.5' : 'py-3.5 px-4'}`}>
+          <span className={`font-black font-mono tracking-wider text-white ${isCompact ? 'text-xl sm:text-[24px] md:text-[26px] leading-none' : 'text-5xl sm:text-6xl'}`}>
             {formatDateBR(item.loadUntilDate || item.validityDate)}
           </span>
         </div>
 
-        {/* Right: Curva Box (Top CURVA, Bottom Large Letter in Black Box) */}
-        <div className={`border-2 border-black flex flex-col items-center justify-center shrink-0 text-center overflow-hidden ${isCompact ? 'min-w-[52px]' : 'min-w-[80px]'}`}>
-          <div className={`bg-white text-black font-black tracking-wider border-b-2 border-black w-full text-center ${isCompact ? 'text-[8.5px] py-0.2' : 'text-xs py-0.5'}`}>
+        {/* Right: Curva Box */}
+        <div className={`border-2 border-black flex flex-col items-center justify-between shrink-0 text-center overflow-hidden bg-black ${isCompact ? 'min-w-[64px] sm:min-w-[72px]' : 'min-w-[110px]'}`}>
+          <div className={`bg-white text-black font-black tracking-wider border-b border-black w-full text-center ${isCompact ? 'text-[9px] sm:text-[10px] py-0.2 leading-none' : 'text-sm py-1'}`}>
             CURVA
           </div>
-          <div className={`w-full bg-black text-white font-black flex items-center justify-center font-mono ${isCompact ? 'text-xl sm:text-2xl py-0.2' : 'text-4xl py-1.5'}`}>
+          <div className={`w-full flex-1 bg-black text-white font-black flex items-center justify-center font-mono ${isCompact ? 'text-xl sm:text-[26px] py-0.2 leading-none' : 'text-5xl py-2'}`}>
             {item.abcClass || 'A'}
           </div>
         </div>
       </div>
 
-      {/* 4. SUB-DATES: Pré-bloq & Validade */}
-      <div className={`flex items-center justify-between px-1 font-sans ${isCompact ? 'text-[10px] sm:text-[11px] my-0.5' : 'text-base sm:text-lg my-1.5'}`}>
-        <div>
-          <span className="font-black text-black">Pré-bloq:</span>{' '}
-          <span className="font-mono font-black text-black">{formatDateBR(item.preBlockDate)}</span>
+      {/* 4. SUB-DATES: Pré-bloq, Recebimento & VALIDADE MAXIMIZADA EM NEGRITO */}
+      <div className={`flex items-center justify-between px-1.5 bg-slate-50 border-y-2 border-black font-sans ${isCompact ? 'py-0.5 my-0.5' : 'py-2 my-2'}`}>
+        <div className="flex items-center gap-2 sm:gap-3.5">
+          <div>
+            <span className="font-black text-black uppercase text-[9.5px] sm:text-[10.5px]">Pré-bloq:</span>{' '}
+            <span className="font-mono font-black text-black text-[11px] sm:text-xs">
+              {formatDateBR(subtractDaysFromDate(item.validityDate, 30))}
+            </span>
+          </div>
+          <div>
+            <span className="font-black text-black uppercase text-[9.5px] sm:text-[10.5px]">Receb:</span>{' '}
+            <span className="font-mono font-black text-black text-[11px] sm:text-xs">{formatDateBR(currentPull.header.receiptDate)}</span>
+          </div>
         </div>
-        <div>
-          <span className="font-black text-black">Validade:</span>{' '}
-          <span className="font-mono font-black text-black">{formatDateBR(item.validityDate)}</span>
+        <div className="flex items-baseline gap-1 text-right">
+          <span className="font-black uppercase text-black tracking-wider text-[11px] sm:text-xs md:text-sm">Validade:</span>{' '}
+          <span className={`font-mono font-black text-black underline decoration-[2.5px] ${isCompact ? 'text-lg sm:text-xl md:text-[22px] leading-none' : 'text-3xl sm:text-4xl'}`}>
+            {formatDateBR(item.validityDate)}
+          </span>
         </div>
       </div>
 
-      {/* 5. RECEIPT DATE & 7-COLUMN METADATA GRID */}
-      <div>
-        <div className={`text-left font-bold text-black px-0.5 mb-0.5 ${isCompact ? 'text-[8.5px] sm:text-[9.5px]' : 'text-xs sm:text-sm'}`}>
-          Receb.: <span className="font-mono font-bold">{formatDateBR(currentPull.header.receiptDate)}</span>
+      {/* 5. 8-COLUMN METADATA GRID (CONFERENTE, TURNO, HORA, QTD TOTAL, QTD LASTRO, NOTA, ORIGEM, CARRETA) */}
+      <div className={`border-2 border-black grid grid-cols-[1.55fr_0.85fr_0.8fr_1fr_1fr_0.95fr_1.45fr_1.05fr] text-center divide-x-2 divide-black bg-white font-sans ${isCompact ? 'text-[7.5px] mt-0.5' : 'text-xs sm:text-sm'}`}>
+        <div className="p-0.5 px-1 flex flex-col justify-center overflow-hidden" title={currentPull.header.receiverName || 'GLADSON LISBOA'}>
+          <div className={`font-black uppercase text-slate-800 leading-none mb-0.5 ${isCompact ? 'text-[7px] sm:text-[7.5px]' : 'text-[10px]'}`}>CONFERENTE</div>
+          <div className={`font-black text-black truncate leading-tight ${isCompact ? 'text-[9px] sm:text-[10px]' : 'text-xs'}`}>{currentPull.header.receiverName || 'GLADSON LISBOA'}</div>
         </div>
 
-        <div className={`border border-black grid grid-cols-7 text-center divide-x divide-black bg-white font-sans ${isCompact ? 'text-[7.5px] sm:text-[8px]' : 'text-[11px] sm:text-xs'}`}>
-          <div className="p-0.5">
-            <div className="font-bold uppercase text-[6.5px] sm:text-[7px] text-slate-700">CONFERENTE</div>
-            <div className="font-bold text-black truncate">{currentPull.header.receiverName || 'Gilson'}</div>
-          </div>
+        <div className="p-0.5 flex flex-col justify-center overflow-hidden">
+          <div className={`font-black uppercase text-slate-800 leading-none mb-0.5 ${isCompact ? 'text-[7px] sm:text-[7.5px]' : 'text-[10px]'}`}>TURNO</div>
+          <div className={`font-black text-black leading-tight ${isCompact ? 'text-[9px] sm:text-[10px]' : 'text-xs'}`}>{currentPull.header.shift || 'Manhã'}</div>
+        </div>
 
-          <div className="p-0.5">
-            <div className="font-bold uppercase text-[6.5px] sm:text-[7px] text-slate-700">TURNO</div>
-            <div className="font-bold text-black">{currentPull.header.shift || 'Tarde'}</div>
-          </div>
+        <div className="p-0.5 flex flex-col justify-center overflow-hidden">
+          <div className={`font-black uppercase text-slate-800 leading-none mb-0.5 ${isCompact ? 'text-[7px] sm:text-[7.5px]' : 'text-[10px]'}`}>HORA</div>
+          <div className={`font-black text-black font-mono leading-tight ${isCompact ? 'text-[9.5px] sm:text-[10.5px]' : 'text-xs'}`}>{currentPull.header.receiptTime || '08:32'}</div>
+        </div>
 
-          <div className="p-0.5">
-            <div className="font-bold uppercase text-[6.5px] sm:text-[7px] text-slate-700">HORA</div>
-            <div className="font-bold text-black font-mono">{currentPull.header.receiptTime || '15:30'}</div>
-          </div>
+        <div className="p-0.5 flex flex-col justify-center bg-slate-50 overflow-hidden">
+          <div className={`font-black uppercase text-slate-800 leading-none mb-0.5 ${isCompact ? 'text-[7px] sm:text-[7.5px]' : 'text-[10px]'}`}>QTD TOTAL</div>
+          {displayQuantityTotal === 'CADASTRAR' ? (
+            <span className={`font-black text-amber-800 bg-amber-100 border border-amber-300 rounded px-0.5 py-0.2 tracking-tighter uppercase leading-none truncate inline-block ${isCompact ? 'text-[6px]' : 'text-[9px]'}`}>
+              CADASTRAR
+            </span>
+          ) : (
+            <div className={`font-black text-black font-mono leading-tight ${isCompact ? 'text-[10.5px] sm:text-[11.5px]' : 'text-sm'}`}>{displayQuantityTotal}</div>
+          )}
+        </div>
 
-          <div className="p-0.5 bg-slate-50">
-            <div className="font-bold uppercase text-[6.5px] sm:text-[7px] text-slate-700">QTDE TT</div>
-            <div className="font-bold text-black font-mono">{quantityInPallet || item.quantitySku}</div>
-          </div>
+        <div className="p-0.5 flex flex-col justify-center bg-slate-50 overflow-hidden">
+          <div className={`font-black uppercase text-slate-800 leading-none mb-0.5 ${isCompact ? 'text-[7px] sm:text-[7.5px]' : 'text-[10px]'}`}>QTD LASTRO</div>
+          {displayQuantityLastro === 'CADASTRAR' ? (
+            <span className={`font-black text-amber-800 bg-amber-100 border border-amber-300 rounded px-0.5 py-0.2 tracking-tighter uppercase leading-none truncate inline-block ${isCompact ? 'text-[6px]' : 'text-[9px]'}`}>
+              CADASTRAR
+            </span>
+          ) : (
+            <div className={`font-black text-black font-mono leading-tight ${isCompact ? 'text-[10.5px] sm:text-[11.5px]' : 'text-sm'}`}>{displayQuantityLastro}</div>
+          )}
+        </div>
 
-          <div className="p-0.5">
-            <div className="font-bold uppercase text-[6.5px] sm:text-[7px] text-slate-700">NOTA</div>
-            <div className="font-bold text-black font-mono truncate">{currentPull.header.nfeNumber}</div>
-          </div>
+        <div className="p-0.5 flex flex-col justify-center overflow-hidden">
+          <div className={`font-black uppercase text-slate-800 leading-none mb-0.5 ${isCompact ? 'text-[7px] sm:text-[7.5px]' : 'text-[10px]'}`}>NOTA</div>
+          <div className={`font-black text-black font-mono truncate leading-tight ${isCompact ? 'text-[9.5px] sm:text-[10.5px]' : 'text-xs'}`}>{currentPull.header.nfeNumber}</div>
+        </div>
 
-          <div className="p-0.5">
-            <div className="font-bold uppercase text-[6.5px] sm:text-[7px] text-slate-700">ORIGEM</div>
-            <div className="font-bold text-black truncate">{currentPull.header.factoryOrigin || 'DR João Pessoa'}</div>
-          </div>
+        <div className="p-0.5 px-0.5 flex flex-col justify-center overflow-hidden" title={currentPull.header.factoryOrigin || 'F. Itapissuma'}>
+          <div className={`font-black uppercase text-slate-800 leading-none mb-0.5 ${isCompact ? 'text-[7px] sm:text-[7.5px]' : 'text-[10px]'}`}>ORIGEM</div>
+          <div className={`font-black text-black truncate leading-tight ${isCompact ? 'text-[8.5px] sm:text-[9.5px]' : 'text-xs'}`}>{currentPull.header.factoryOrigin || 'F. Itapissuma'}</div>
+        </div>
 
-          <div className="p-0.5">
-            <div className="font-bold uppercase text-[6.5px] sm:text-[7px] text-slate-700">CARRETA</div>
-            <div className="font-bold text-black font-mono uppercase truncate">{currentPull.header.truckPlate || 'RLT5J44'}</div>
-          </div>
+        <div className="p-0.5 flex flex-col justify-center overflow-hidden">
+          <div className={`font-black uppercase text-slate-800 leading-none mb-0.5 ${isCompact ? 'text-[7px] sm:text-[7.5px]' : 'text-[10px]'}`}>CARRETA</div>
+          <div className={`font-black text-black font-mono uppercase truncate leading-tight ${isCompact ? 'text-[9.5px] sm:text-[10.5px]' : 'text-xs'}`}>{currentPull.header.truckPlate || 'RLU3F59'}</div>
         </div>
       </div>
     </div>

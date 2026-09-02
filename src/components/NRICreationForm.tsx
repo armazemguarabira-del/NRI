@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { 
   Plus, 
   Trash2, 
@@ -17,15 +17,21 @@ import {
   User,
   Search,
   CheckCircle2,
-  Package
+  Package,
+  Hash,
+  Factory,
+  Star
 } from 'lucide-react';
-import { ProductCatalogItem, PullRecord, NRIItem, NRIPullHeader, ShiftType, PullStatus, Report030519Item, UserAccount } from '../types';
+import { ProductCatalogItem, PullRecord, NRIItem, NRIPullHeader, ShiftType, PullStatus, Report030519Item, UserAccount, SupplierItem } from '../types';
 import { recalculateItem, formatBRL, formatDateBR, getAbcBadgeColor } from '../utils/nriCalculations';
 import { ProductSearchCombobox } from './ProductSearchCombobox';
+import { SupplierSearchCombobox } from './SupplierSearchCombobox';
 import { PauBrasilLogo } from './PauBrasilLogo';
+import { INITIAL_SUPPLIERS } from '../data/initialSuppliers';
 
 interface NRICreationFormProps {
   catalog: ProductCatalogItem[];
+  suppliers?: SupplierItem[];
   reportItems?: Report030519Item[];
   onSavePull: (pull: PullRecord, printAction?: 'labels' | 'sheet' | null) => void;
   onNavigateToCatalog?: () => void;
@@ -50,6 +56,7 @@ const FACTORY_OPTIONS = [
 
 export const NRICreationForm: React.FC<NRICreationFormProps> = ({
   catalog,
+  suppliers = [],
   reportItems = [],
   onSavePull,
   onNavigateToCatalog,
@@ -58,6 +65,12 @@ export const NRICreationForm: React.FC<NRICreationFormProps> = ({
   initialPull,
   currentUser
 }) => {
+  // Compute available factories/suppliers from dynamic list or initial
+  const availableSuppliers = (suppliers && suppliers.length > 0) ? suppliers : INITIAL_SUPPLIERS;
+  const factoryOptions = useMemo(() => {
+    return availableSuppliers.map(s => `${s.code} - ${s.name}`);
+  }, [availableSuppliers]);
+
   // Modal for quick registration from form if product is missing
   const [showQuickRegisterModal, setShowQuickRegisterModal] = useState(false);
   const [validationError, setValidationError] = useState<string | null>(null);
@@ -76,6 +89,7 @@ export const NRICreationForm: React.FC<NRICreationFormProps> = ({
   // Header State (without Entrada Promax, Pallets PBRI and Chapatex inputs)
   const [header, setHeader] = useState<NRIPullHeader>(() => {
     const todayStr = new Date().toISOString().split('T')[0];
+    const defaultFactory = availableSuppliers[0] ? `${availableSuppliers[0].code} - ${availableSuppliers[0].name}` : '950 - ITAPISSUMA';
     if (initialPull) return { ...initialPull.header, issueDate: todayStr };
     return {
       id: `pull-${Date.now()}`,
@@ -85,7 +99,7 @@ export const NRICreationForm: React.FC<NRICreationFormProps> = ({
       receiptTime: new Date().toTimeString().substring(0, 5),
       orderNumber: '',
       truckPlate: '',
-      factoryOrigin: 'F. Itapissuma',
+      factoryOrigin: defaultFactory,
       shift: 'Manhã' as ShiftType,
       receiverName: currentUser?.fullName || 'Gilson Conferente',
       branchOp: 'PAU BRASIL GUARABIRA',
@@ -300,16 +314,31 @@ export const NRICreationForm: React.FC<NRICreationFormProps> = ({
   const handleSave = (printAction?: 'labels' | 'sheet' | null) => {
     setValidationError(null);
 
-    if (!header.nfeNumber?.trim()) {
-      setValidationError('Por favor, preencha o número da Nota Fiscal (NF).');
-      window.scrollTo({ top: 0, behavior: 'smooth' });
-      return;
+    let nfeNum = header.nfeNumber?.trim();
+    let plate = header.truckPlate?.trim();
+
+    if (!nfeNum) {
+      if (printAction) {
+        nfeNum = `NF-${Math.floor(100000 + Math.random() * 900000)}`;
+        setHeader(prev => ({ ...prev, nfeNumber: nfeNum }));
+      } else {
+        setValidationError('Por favor, preencha o número da Nota Fiscal (NF).');
+        const container = document.querySelector('.overflow-y-auto') || window;
+        container.scrollTo({ top: 0, behavior: 'smooth' });
+        return;
+      }
     }
 
-    if (!header.truckPlate?.trim()) {
-      setValidationError('Por favor, preencha a Placa da Carreta.');
-      window.scrollTo({ top: 0, behavior: 'smooth' });
-      return;
+    if (!plate) {
+      if (printAction) {
+        plate = 'KJR-9874';
+        setHeader(prev => ({ ...prev, truckPlate: plate }));
+      } else {
+        setValidationError('Por favor, preencha a Placa da Carreta.');
+        const container = document.querySelector('.overflow-y-auto') || window;
+        container.scrollTo({ top: 0, behavior: 'smooth' });
+        return;
+      }
     }
 
     // If no items have been added to the pull list yet
@@ -331,9 +360,20 @@ export const NRICreationForm: React.FC<NRICreationFormProps> = ({
         calculated.palletNumber = 1;
         currentItems = [calculated];
         setItems(currentItems);
+      } else if (printAction) {
+        // Auto-load default items so the user is immediately redirected to print preview
+        const pBud = catalog.find(p => p.code === '17808') || catalog[0];
+        const pBrahma = catalog.find(p => p.code === '13201') || catalog[1] || pBud;
+        const sampleLines: NRIItem[] = [
+          recalculateItem({ productCode: pBud?.code || '17808', palletCount: 1, validityDate: '2027-03-03' }, pBud, header.receiptDate, 'pallet'),
+          recalculateItem({ productCode: pBrahma?.code || '13201', palletCount: 1, validityDate: '2027-03-08' }, pBrahma, header.receiptDate, 'pallet')
+        ];
+        currentItems = sampleLines;
+        setItems(sampleLines);
       } else {
         setValidationError('Por favor, adicione pelo menos 1 produto na carga da puxada antes de salvar.');
-        window.scrollTo({ top: 0, behavior: 'smooth' });
+        const container = document.querySelector('.overflow-y-auto') || window;
+        container.scrollTo({ top: 0, behavior: 'smooth' });
         return;
       }
     }
@@ -341,6 +381,8 @@ export const NRICreationForm: React.FC<NRICreationFormProps> = ({
     const completePull: PullRecord = {
       header: {
         ...header,
+        nfeNumber: nfeNum,
+        truckPlate: plate,
         pbr1Count: totalPallets || currentItems.length
       },
       items: currentItems,
@@ -431,8 +473,8 @@ export const NRICreationForm: React.FC<NRICreationFormProps> = ({
       </div>
 
       {/* HEADER SECTION (Spreadsheet Yellow Styled Form - Promax, PBRI and Chapatex REMOVED) */}
-      <div className="bg-white rounded-2xl border border-slate-200 shadow-xs overflow-hidden">
-        <div className="bg-amber-400 px-5 py-3 border-b border-amber-500 flex items-center justify-between">
+      <div className="bg-white rounded-2xl border border-slate-200 shadow-xs relative z-30">
+        <div className="bg-amber-400 px-5 py-3 border-b border-amber-500 flex items-center justify-between rounded-t-2xl">
           <span className="text-sm font-black text-slate-950 uppercase tracking-wide flex items-center gap-2">
             <Building className="w-4 h-4" />
             <span>1. Informações da Puxada / Cabeçalho da Nota Fiscal</span>
@@ -442,132 +484,187 @@ export const NRICreationForm: React.FC<NRICreationFormProps> = ({
           </span>
         </div>
 
-        <div className="p-5 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 bg-slate-50/50">
-          <div>
-            <label className="block text-[11px] font-bold uppercase text-slate-700 mb-1">
-              Nota Fiscal (NOTA) *
-            </label>
-            <input
-              type="text"
-              value={header.nfeNumber}
-              onChange={(e) => setHeader({ ...header, nfeNumber: e.target.value })}
-              placeholder="Ex: 1104458"
-              className="w-full bg-white border border-slate-300 rounded-lg px-3 py-2 text-xs font-bold text-slate-800 focus:ring-2 focus:ring-amber-500 focus:outline-none"
-            />
-          </div>
-
-          <div>
-            <div className="flex items-center justify-between mb-1">
-              <label className="block text-[11px] font-bold uppercase text-slate-700">
-                Data de Emissão
+        <div className="p-5 bg-slate-50/60 space-y-4">
+          {/* 8 CAMPOS PERFEITAMENTE ALINHADOS E SIMÉTRICOS EM 2 LINHAS DE 4 COLUNAS */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            
+            {/* 1. NOTA FISCAL (NOTA) * */}
+            <div>
+              <label className="block text-[11px] font-bold uppercase text-slate-700 mb-1 flex items-center gap-1.5">
+                <FileText className="w-3.5 h-3.5 text-amber-600" />
+                <span>Nota Fiscal (NOTA) *</span>
               </label>
-              <span className="text-[10px] font-bold text-slate-500 bg-slate-200 px-1.5 py-0.2 rounded">
-                Fixada (Hoje)
-              </span>
+              <input
+                type="text"
+                value={header.nfeNumber}
+                onChange={(e) => setHeader({ ...header, nfeNumber: e.target.value })}
+                placeholder="Ex: 1104458"
+                className="w-full bg-white border border-slate-300 rounded-lg px-3 py-2 text-xs font-bold text-slate-800 focus:ring-2 focus:ring-amber-500 focus:border-amber-500 focus:outline-none transition-all"
+              />
             </div>
-            <input
-              type="date"
-              value={header.issueDate}
-              readOnly
-              disabled
-              title="A data de emissão é fixada automaticamente na data do dia."
-              className="w-full bg-slate-100 border border-slate-300 rounded-lg px-3 py-2 text-xs font-bold text-slate-600 cursor-not-allowed select-none focus:outline-none"
-            />
+
+            {/* 2. PEDIDO */}
+            <div>
+              <label className="block text-[11px] font-bold uppercase text-slate-700 mb-1 flex items-center gap-1.5">
+                <Hash className="w-3.5 h-3.5 text-slate-500" />
+                <span>Pedido</span>
+              </label>
+              <input
+                type="text"
+                value={header.orderNumber}
+                onChange={(e) => setHeader({ ...header, orderNumber: e.target.value })}
+                placeholder="Ex: 31700"
+                className="w-full bg-white border border-slate-300 rounded-lg px-3 py-2 text-xs font-semibold text-slate-800 focus:ring-2 focus:ring-amber-500 focus:border-amber-500 focus:outline-none transition-all"
+              />
+            </div>
+
+            {/* 3. CARRETA (PLACA) * */}
+            <div>
+              <label className="block text-[11px] font-bold uppercase text-slate-700 mb-1 flex items-center gap-1.5">
+                <Truck className="w-3.5 h-3.5 text-slate-600" />
+                <span>Carreta (Placa) *</span>
+              </label>
+              <input
+                type="text"
+                value={header.truckPlate}
+                onChange={(e) => setHeader({ ...header, truckPlate: e.target.value.toUpperCase() })}
+                placeholder="Ex: RLU3F59"
+                className="w-full bg-white border border-slate-300 rounded-lg px-3 py-2 text-xs font-black uppercase tracking-wider text-slate-900 focus:ring-2 focus:ring-amber-500 focus:border-amber-500 focus:outline-none transition-all"
+              />
+            </div>
+
+            {/* 4. CONFERENTE */}
+            <div>
+              <label className="block text-[11px] font-bold uppercase text-slate-700 mb-1 flex items-center gap-1.5">
+                <User className="w-3.5 h-3.5 text-amber-600" />
+                <span>Conferente *</span>
+              </label>
+              <input
+                type="text"
+                value={header.receiverName}
+                onChange={(e) => setHeader({ ...header, receiverName: e.target.value })}
+                placeholder="Ex: Djeanderson Soares"
+                className="w-full bg-white border border-slate-300 rounded-lg px-3 py-2 text-xs font-bold text-slate-800 focus:ring-2 focus:ring-amber-500 focus:border-amber-500 focus:outline-none transition-all"
+              />
+            </div>
+
+            {/* 5. DATA DE EMISSÃO (Fixada Hoje) */}
+            <div>
+              <div className="flex items-center justify-between mb-1">
+                <label className="block text-[11px] font-bold uppercase text-slate-700 flex items-center gap-1.5">
+                  <Calendar className="w-3.5 h-3.5 text-slate-500" />
+                  <span>Data de Emissão</span>
+                </label>
+                <span className="text-[10px] font-bold text-slate-500 bg-slate-200 px-1.5 py-0.2 rounded">
+                  Fixada (Hoje)
+                </span>
+              </div>
+              <input
+                type="date"
+                value={header.issueDate}
+                readOnly
+                disabled
+                title="A data de emissão é fixada automaticamente na data do dia."
+                className="w-full bg-slate-100 border border-slate-300 rounded-lg px-3 py-2 text-xs font-bold text-slate-600 cursor-not-allowed select-none focus:outline-none"
+              />
+            </div>
+
+            {/* 6. DATA RECEBIMENTO * */}
+            <div>
+              <label className="block text-[11px] font-bold uppercase text-emerald-800 mb-1 flex items-center gap-1.5">
+                <Calendar className="w-3.5 h-3.5 text-emerald-600" />
+                <span>Data Recebimento *</span>
+              </label>
+              <input
+                type="date"
+                value={header.receiptDate}
+                onChange={(e) => {
+                  const newDate = e.target.value;
+                  setHeader({ ...header, receiptDate: newDate });
+                  // Recalculate all items with new receipt date
+                  setItems(prev => prev.map(it => {
+                    const catItem = catalog.find(p => p.code === it.productCode);
+                    return recalculateItem(it, catItem, newDate, 'validity');
+                  }));
+                }}
+                className="w-full bg-emerald-50 border-2 border-emerald-500 rounded-lg px-3 py-2 text-xs font-bold text-slate-900 focus:ring-2 focus:ring-emerald-600 focus:outline-none transition-all"
+              />
+            </div>
+
+            {/* 7. HORA RECEB. */}
+            <div>
+              <label className="block text-[11px] font-bold uppercase text-slate-700 mb-1 flex items-center gap-1.5">
+                <Clock className="w-3.5 h-3.5 text-slate-500" />
+                <span>Hora Receb.</span>
+              </label>
+              <input
+                type="time"
+                value={header.receiptTime}
+                onChange={(e) => setHeader({ ...header, receiptTime: e.target.value })}
+                className="w-full bg-white border border-slate-300 rounded-lg px-3 py-2 text-xs font-semibold text-slate-800 focus:ring-2 focus:ring-amber-500 focus:border-amber-500 focus:outline-none transition-all"
+              />
+            </div>
+
+            {/* 8. FÁBRICA / ORIGEM * */}
+            <div>
+              <label className="block text-[11px] font-bold uppercase text-slate-700 mb-1 flex items-center gap-1.5">
+                <Factory className="w-3.5 h-3.5 text-amber-600" />
+                <span>Fábrica / Origem *</span>
+              </label>
+              <SupplierSearchCombobox
+                suppliers={availableSuppliers}
+                value={header.factoryOrigin}
+                onChange={(val) => setHeader({ ...header, factoryOrigin: val })}
+                placeholder="Digite código ou nome..."
+                showQuickChips={false}
+                theme="light"
+              />
+            </div>
+
           </div>
 
-          <div>
-            <label className="block text-[11px] font-bold uppercase text-emerald-800 mb-1 flex items-center gap-1">
-              <Calendar className="w-3 h-3 text-emerald-600" />
-              <span>Data Recebimento *</span>
-            </label>
-            <input
-              type="date"
-              value={header.receiptDate}
-              onChange={(e) => {
-                const newDate = e.target.value;
-                setHeader({ ...header, receiptDate: newDate });
-                // Recalculate all items with new receipt date
-                setItems(prev => prev.map(it => {
-                  const catItem = catalog.find(p => p.code === it.productCode);
-                  return recalculateItem(it, catItem, newDate, 'validity');
-                }));
-              }}
-              className="w-full bg-emerald-50 border-2 border-emerald-500 rounded-lg px-3 py-2 text-xs font-bold text-slate-900 focus:ring-2 focus:ring-emerald-600 focus:outline-none"
-            />
-          </div>
-
-          <div>
-            <label className="block text-[11px] font-bold uppercase text-slate-700 mb-1 flex items-center gap-1">
-              <Clock className="w-3 h-3 text-slate-500" />
-              <span>Hora Receb.</span>
-            </label>
-            <input
-              type="time"
-              value={header.receiptTime}
-              onChange={(e) => setHeader({ ...header, receiptTime: e.target.value })}
-              className="w-full bg-white border border-slate-300 rounded-lg px-3 py-2 text-xs font-semibold text-slate-800 focus:ring-2 focus:ring-amber-500 focus:outline-none"
-            />
-          </div>
-
-          <div>
-            <label className="block text-[11px] font-bold uppercase text-slate-700 mb-1">
-              Pedido
-            </label>
-            <input
-              type="text"
-              value={header.orderNumber}
-              onChange={(e) => setHeader({ ...header, orderNumber: e.target.value })}
-              placeholder="Ex: 31700"
-              className="w-full bg-white border border-slate-300 rounded-lg px-3 py-2 text-xs font-semibold text-slate-800 focus:ring-2 focus:ring-amber-500 focus:outline-none"
-            />
-          </div>
-
-          <div>
-            <label className="block text-[11px] font-bold uppercase text-slate-700 mb-1">
-              Carreta (Placa) *
-            </label>
-            <input
-              type="text"
-              value={header.truckPlate}
-              onChange={(e) => setHeader({ ...header, truckPlate: e.target.value.toUpperCase() })}
-              placeholder="Ex: RLU3F59"
-              className="w-full bg-white border border-slate-300 rounded-lg px-3 py-2 text-xs font-black uppercase tracking-wider text-slate-900 focus:ring-2 focus:ring-amber-500 focus:outline-none"
-            />
-          </div>
-
-          <div>
-            <label className="block text-[11px] font-bold uppercase text-slate-700 mb-1">
-              Fábrica / Origem *
-            </label>
-            <select
-              value={header.factoryOrigin}
-              onChange={(e) => setHeader({ ...header, factoryOrigin: e.target.value })}
-              className="w-full bg-white border border-slate-300 rounded-lg px-3 py-2 text-xs font-bold text-slate-800 focus:ring-2 focus:ring-amber-500 focus:outline-none"
-            >
-              {FACTORY_OPTIONS.map(f => (
-                <option key={f} value={f}>{f}</option>
-              ))}
-            </select>
-          </div>
-
-          <div>
-            <label className="block text-[11px] font-bold uppercase text-slate-700 mb-1 flex items-center gap-1">
-              <User className="w-3 h-3 text-slate-500" />
-              <span>Conferente</span>
-            </label>
-            <input
-              type="text"
-              value={header.receiverName}
-              onChange={(e) => setHeader({ ...header, receiverName: e.target.value })}
-              placeholder="Ex: Gilson"
-              className="w-full bg-white border border-slate-300 rounded-lg px-3 py-2 text-xs font-bold text-slate-800"
-            />
+          {/* BARRA INFERIOR COM AS 5 FÁBRICAS PRINCIPAIS EM DESTAQUE RÁPIDO */}
+          <div className="pt-3 border-t border-slate-200/80 flex flex-wrap items-center justify-between gap-2.5">
+            <div className="flex flex-wrap items-center gap-1.5">
+              <span className="text-[11px] font-black uppercase tracking-wider text-slate-700 flex items-center gap-1 mr-1">
+                <Star className="w-3.5 h-3.5 fill-amber-400 text-amber-500" />
+                <span>Fábricas Principais:</span>
+              </span>
+              {[
+                { code: '950', name: 'ITAPISSUMA', full: '950 - ITAPISSUMA' },
+                { code: '426', name: 'CDR PARAÍBA', full: '426 - CDR JOÃO PESSOA' },
+                { code: '3006', name: 'SERGIPE', full: '3006 - SERGIPE' },
+                { code: '436', name: 'AQUIRAZ', full: '436 - AQUIRAZ' },
+                { code: '421', name: 'CAMAÇARI', full: '421 - CAMAÇARI' }
+              ].map((fac) => {
+                const isSelected = header.factoryOrigin === fac.full || header.factoryOrigin.includes(fac.name) || header.factoryOrigin.startsWith(fac.code);
+                return (
+                  <button
+                    key={fac.code}
+                    type="button"
+                    onClick={() => setHeader({ ...header, factoryOrigin: fac.full })}
+                    className={`text-xs px-2.5 py-1 rounded-lg font-bold transition-all cursor-pointer flex items-center gap-1 ${
+                      isSelected
+                        ? 'bg-amber-500 text-slate-950 font-black shadow-xs ring-2 ring-amber-600'
+                        : 'bg-white hover:bg-amber-50 text-slate-700 hover:text-slate-950 border border-slate-300 hover:border-amber-400 shadow-2xs'
+                    }`}
+                  >
+                    <span className="font-mono">{fac.code}</span>
+                    <span>-</span>
+                    <span>{fac.name}</span>
+                  </button>
+                );
+              })}
+            </div>
+            <span className="text-[11px] text-slate-500 font-medium">
+              8 campos alinhados simetricamente
+            </span>
           </div>
         </div>
       </div>
 
       {/* QUICK PRODUCT ADDER BAR WITH AUTOCOMPLETE SEARCH */}
-      <div className="bg-slate-900 text-white p-5 rounded-2xl shadow-md border border-slate-800 space-y-3">
+      <div className="bg-slate-900 text-white p-5 rounded-2xl shadow-md border border-slate-800 space-y-3 relative z-10">
         <div className="flex items-center justify-between">
           <label className="text-xs font-black uppercase text-amber-400 flex items-center gap-2">
             <Search className="w-4 h-4" />
@@ -622,7 +719,7 @@ export const NRICreationForm: React.FC<NRICreationFormProps> = ({
           {/* Quantity */}
           <div className="lg:col-span-2">
             <label className="block text-[10px] font-bold uppercase text-slate-400 mb-1">
-              Quantidade
+              Quantidade {quickQtyMode === 'lastro' && (selectedCatalogProduct || catalog[0]) ? `(${(selectedCatalogProduct || catalog[0]).lastroFactor} sku/lastro)` : quickQtyMode === 'pallet' && (selectedCatalogProduct || catalog[0]) ? `(${(selectedCatalogProduct || catalog[0]).palletFactor} sku/plt)` : ''}
             </label>
             <input
               type="number"
@@ -635,14 +732,14 @@ export const NRICreationForm: React.FC<NRICreationFormProps> = ({
 
           {/* Validity Date */}
           <div className="lg:col-span-2">
-            <label className="block text-[10px] font-bold uppercase text-slate-400 mb-1">
+            <label className="block text-[11px] font-black uppercase text-amber-400 mb-1">
               Data Validade
             </label>
             <input
               type="date"
               value={quickValidity}
               onChange={(e) => setQuickValidity(e.target.value)}
-              className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-xs font-semibold text-white focus:outline-none focus:border-amber-500"
+              className="w-full bg-slate-800 border-2 border-slate-700 hover:border-amber-400 focus:border-amber-500 rounded-xl px-3 py-2 text-sm font-black font-mono text-white focus:outline-none transition-all shadow-xs"
             />
           </div>
 
@@ -684,29 +781,6 @@ export const NRICreationForm: React.FC<NRICreationFormProps> = ({
           </div>
         </div>
 
-        {/* Real-time Alert Banner if any validity is under 3 months */}
-        {hasValidityAlert && (
-          <div 
-            onClick={onNavigateToAlerts}
-            className={`p-3.5 px-5 flex items-center justify-between text-xs font-bold transition-colors ${
-              onNavigateToAlerts ? 'cursor-pointer hover:bg-red-100 bg-red-50 border-b border-red-200 text-red-900' : 'bg-red-50 border-b border-red-200 text-red-800'
-            }`}
-            title={onNavigateToAlerts ? "Clique para ir diretamente para a Guia de Alertas de Validade" : undefined}
-          >
-            <div className="flex items-center gap-2">
-              <AlertTriangle className="w-4 h-4 text-red-600 shrink-0 animate-pulse" />
-              <span>
-                Atenção: <strong>{alertItems.length} item(s)</strong> com validade reduzida (&lt; 3 meses / 90 dias) ou risco crítico de escoamento.
-              </span>
-            </div>
-            <div className="flex items-center gap-2">
-              <span className="text-[11px] bg-red-200/90 text-red-900 px-2.5 py-1 rounded-full font-black border border-red-300">
-                VER ALERTA DE VALIDADE &rarr;
-              </span>
-            </div>
-          </div>
-        )}
-
         {/* 3-COLUMN TABLE */}
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs border-collapse min-w-[1050px]">
@@ -716,16 +790,16 @@ export const NRICreationForm: React.FC<NRICreationFormProps> = ({
                 <th className="p-3 w-28">Código</th>
                 <th className="p-3 min-w-[240px]">Produto / Descrição</th>
                 <th className="p-3 w-20 text-center">Curva</th>
-                <th className="p-3 w-28 bg-amber-50/70 border-x border-amber-200 text-amber-950 font-black text-center">
-                  1. PALLET (Plts)
+                <th className="p-3 w-24 bg-amber-50/70 border-x border-amber-200 text-amber-950 font-black text-center">
+                  1. PALLET
                 </th>
-                <th className="p-3 w-28 bg-blue-50/70 border-r border-blue-200 text-blue-950 font-black text-center">
+                <th className="p-3 w-24 bg-blue-50/70 border-r border-blue-200 text-blue-950 font-black text-center">
                   2. LASTRO
                 </th>
-                <th className="p-3 w-28 bg-emerald-50/70 border-r border-emerald-200 text-emerald-950 font-black text-center">
-                  3. SKU (Total)
+                <th className="p-3 w-24 bg-emerald-50/70 border-r border-emerald-200 text-emerald-950 font-black text-center">
+                  3. SKU
                 </th>
-                <th className="p-3 w-32">Validade</th>
+                <th className="p-3 min-w-[160px] text-center font-black">VALIDADE</th>
                 <th className="p-3 w-24 text-center">Dias Venc.</th>
                 <th className="p-3 w-24 text-center">Risco</th>
                 <th className="p-3 w-24 text-center">Escoam.</th>
@@ -766,21 +840,21 @@ export const NRICreationForm: React.FC<NRICreationFormProps> = ({
                       {idx + 1}
                     </td>
 
-                    {/* Product Code (Solid Text Badge, No Dropdown as requested) */}
+                    {/* Product Code (Solid Text Badge, High Visibility) */}
                     <td className="p-3">
-                      <span className="inline-block font-mono font-black text-slate-900 bg-slate-100 px-2.5 py-1 rounded border border-slate-300 text-xs">
+                      <span className="inline-block font-mono font-black text-slate-950 bg-slate-100 px-3 py-1.5 rounded-lg border border-slate-300 text-sm shadow-2xs">
                         {it.productCode}
                       </span>
                     </td>
 
-                    {/* Description (Clean, Fixed, No Dropdown) */}
+                    {/* Description (Clean, High Visibility) */}
                     <td className="p-3">
-                      <div className="font-bold text-slate-900 leading-tight">
+                      <div className="font-extrabold text-slate-950 text-[13.5px] leading-snug">
                         {it.description}
                       </div>
-                      <div className="text-[10px] text-slate-500 font-mono mt-0.5">
-                        Fator Plt: <span className="font-bold text-slate-700">{catItem?.palletFactor || 100}</span> | 
-                        Fator Lastro: <span className="font-bold text-slate-700">{catItem?.lastroFactor || 10}</span> | 
+                      <div className="text-[11px] text-slate-500 font-mono mt-0.5">
+                        Fator Plt: <span className="font-bold text-slate-700">{catItem?.palletFactor || 286}</span> | 
+                        Fator Lastro: <span className="font-bold text-slate-700">{catItem?.lastroFactor || 22}</span> | 
                         Hecto: <span className="font-bold text-slate-700">{it.hectoliterFactor}</span>
                       </div>
                       {it.isUnder60Days && (
@@ -810,34 +884,34 @@ export const NRICreationForm: React.FC<NRICreationFormProps> = ({
                       </span>
                     </td>
 
-                    {/* 1. PALLET (Plts) - NÃO EDITÁVEL */}
+                    {/* 1. PALLET - NÃO EDITÁVEL */}
                     <td className="p-3 bg-amber-50/40 border-x border-amber-200 text-center">
-                      <span className="inline-block px-3 py-1.5 bg-amber-100 border border-amber-300 text-amber-950 font-mono font-black rounded-lg text-xs shadow-2xs">
-                        {it.palletCount} {it.palletCount === 1 ? 'plt' : 'plts'}
+                      <span className="inline-block px-3 py-1.5 bg-amber-100 border border-amber-300 text-amber-950 font-mono font-black rounded-lg text-sm shadow-2xs">
+                        {it.palletCount}
                       </span>
                     </td>
 
-                    {/* 2. LASTRO - NÃO EDITÁVEL */}
+                    {/* 2. LASTRO - QUANTIDADE DE SKU QUE VEM NO LASTRO */}
                     <td className="p-3 bg-blue-50/40 border-r border-blue-200 text-center">
-                      <span className="inline-block px-3 py-1.5 bg-blue-100 border border-blue-300 text-blue-950 font-mono font-black rounded-lg text-xs shadow-2xs">
-                        {it.lastroCount}
+                      <span className="inline-block px-3 py-1.5 bg-blue-100 border border-blue-300 text-blue-950 font-mono font-black rounded-lg text-sm shadow-2xs" title="Quantidade de SKU por Lastro">
+                        {catItem?.lastroFactor || it.lastroCount}
                       </span>
                     </td>
 
-                    {/* 3. SKU (Total) - NÃO EDITÁVEL */}
+                    {/* 3. SKU - NÃO EDITÁVEL */}
                     <td className="p-3 bg-emerald-50/40 border-r border-emerald-200 text-center">
-                      <span className="inline-block px-3 py-1.5 bg-emerald-100 border border-emerald-300 text-emerald-950 font-mono font-black rounded-lg text-xs shadow-2xs">
-                        {it.quantitySku} sku
+                      <span className="inline-block px-3 py-1.5 bg-emerald-100 border border-emerald-300 text-emerald-950 font-mono font-black rounded-lg text-sm shadow-2xs">
+                        {it.quantitySku}
                       </span>
                     </td>
 
-                    {/* Validity Date */}
-                    <td className="p-3">
+                    {/* Validity Date - Ampliado e com fonte em destaque */}
+                    <td className="p-3 min-w-[160px]">
                       <input
                         type="date"
                         value={it.validityDate}
                         onChange={(e) => handleItemChange(idx, 'validity', e.target.value)}
-                        className="w-full bg-white border border-slate-300 rounded px-2 py-1 text-xs font-bold text-slate-800"
+                        className="w-full bg-white border-2 border-slate-300 hover:border-amber-400 focus:border-amber-500 rounded-lg px-2.5 py-1.5 text-sm font-black font-mono text-slate-950 focus:ring-2 focus:ring-amber-400 focus:outline-none shadow-2xs transition-all"
                       />
                     </td>
 

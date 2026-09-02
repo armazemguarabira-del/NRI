@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { Search, X, Check, Package, Sparkles, Plus } from 'lucide-react';
 import { ProductCatalogItem } from '../types';
 import { getAbcBadgeColor } from '../utils/nriCalculations';
@@ -24,19 +24,23 @@ export const ProductSearchCombobox: React.FC<ProductSearchComboboxProps> = ({
   const inputRef = useRef<HTMLInputElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
-  const selectedProduct = catalog.find(p => p.code === selectedProductCode) || catalog[0];
+  const selectedProduct = useMemo(() => {
+    return catalog.find(p => p.code === selectedProductCode) || catalog[0];
+  }, [catalog, selectedProductCode]);
 
   // Filter products based on search term (code, description, category, brand)
-  const filteredProducts = catalog.filter(product => {
-    if (!searchTerm.trim()) return true;
+  const filteredProducts = useMemo(() => {
+    if (!searchTerm.trim()) return catalog.slice(0, 60);
     const term = searchTerm.toLowerCase();
-    return (
-      product.code.toLowerCase().includes(term) ||
-      product.description.toLowerCase().includes(term) ||
-      (product.category && product.category.toLowerCase().includes(term)) ||
-      product.abcClass.toLowerCase() === term
-    );
-  });
+    return catalog.filter(product => {
+      return (
+        product.code.toLowerCase().includes(term) ||
+        product.description.toLowerCase().includes(term) ||
+        (product.category && product.category.toLowerCase().includes(term)) ||
+        product.abcClass.toLowerCase() === term
+      );
+    }).slice(0, 60);
+  }, [catalog, searchTerm]);
 
   // Handle outside click to close
   useEffect(() => {
@@ -110,7 +114,7 @@ export const ProductSearchCombobox: React.FC<ProductSearchComboboxProps> = ({
           }}
           onKeyDown={handleKeyDown}
           placeholder="Digite o código (ex: 34608, 17808) ou nome (ex: Skol, Bud, Brahma, Pepsi)..."
-          className="w-full bg-slate-800 border-2 border-slate-700 hover:border-slate-600 focus:border-amber-500 rounded-xl pl-9 pr-10 py-2.5 text-xs font-bold text-white placeholder:text-slate-400 focus:ring-2 focus:ring-amber-500/30 focus:outline-none transition-all shadow-inner"
+          className="w-full bg-slate-800 border-2 border-slate-700 hover:border-slate-600 focus:border-amber-500 rounded-xl pl-9 pr-10 py-2.5 text-[13px] font-bold text-white placeholder:text-slate-400 focus:ring-2 focus:ring-amber-500/30 focus:outline-none transition-all shadow-inner"
         />
 
         {isOpen && searchTerm ? (
@@ -193,14 +197,14 @@ export const ProductSearchCombobox: React.FC<ProductSearchComboboxProps> = ({
 
                     <div className="min-w-0">
                       <div className="flex items-center gap-2">
-                        <span className="font-mono font-black text-amber-400 tracking-wider">
+                        <span className="font-mono font-black text-sm text-amber-400 tracking-wider">
                           {p.code}
                         </span>
-                        <span className="font-bold text-white truncate">
+                        <span className="text-[13.5px] font-bold text-white truncate">
                           {p.description}
                         </span>
                       </div>
-                      <div className="flex items-center gap-3 text-[10px] text-slate-400 font-mono mt-0.5">
+                      <div className="flex items-center gap-3 text-[11px] text-slate-400 font-mono mt-0.5">
                         <span>Fator Plt: <strong className="text-slate-200">{p.palletFactor}</strong></span>
                         <span>•</span>
                         <span>Lastro: <strong className="text-slate-200">{p.lastroFactor}</strong></span>

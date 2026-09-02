@@ -1,0 +1,150 @@
+{
+  "entities": {
+    "PullRecord": {
+      "title": "PullRecord",
+      "description": "Registro de puxada de carreta com cabeçalho e itens",
+      "type": "object",
+      "properties": {
+        "header": { "type": "object", "description": "Dados do cabeçalho da puxada" },
+        "items": { "type": "array", "description": "Lista de itens e SKUs da puxada" },
+        "totalPallets": { "type": "number", "description": "Total de pallets" },
+        "totalSku": { "type": "number", "description": "Total de caixas/SKUs" },
+        "totalHectoliters": { "type": "number", "description": "Total em hectolitros" },
+        "totalValue": { "type": "number", "description": "Valor total em R$" },
+        "alertCount": { "type": "number", "description": "Quantidade de itens com alerta de validade" },
+        "hasValidityAlert": { "type": "boolean", "description": "Indicador de alerta de validade ativo" }
+      }
+    },
+    "BlitzRecord": {
+      "title": "BlitzRecord",
+      "description": "Registro de blitz e auditoria de pallets recebidos",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "nfeNumber": { "type": "string" },
+        "truckPlate": { "type": "string" },
+        "factoryOrigin": { "type": "string" },
+        "productCode": { "type": "string" },
+        "productDescription": { "type": "string" },
+        "blockedQty": { "type": "number" },
+        "retainedQty": { "type": "number" },
+        "damageType": { "type": "string" },
+        "blockDate": { "type": "string" },
+        "conferente": { "type": "string" }
+      }
+    },
+    "PNCRecord": {
+      "title": "PNCRecord",
+      "description": "Produto Não Conforme gerado ou auditado",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "pncNumber": { "type": "string" },
+        "nfeNumber": { "type": "string" },
+        "truckPlate": { "type": "string" },
+        "factoryOrigin": { "type": "string" },
+        "productCode": { "type": "string" },
+        "productDescription": { "type": "string" },
+        "quantityBlocked": { "type": "number" },
+        "reason": { "type": "string" },
+        "fiscalBlockStatus": { "type": "string" }
+      }
+    },
+    "ProductCatalogItem": {
+      "title": "ProductCatalogItem",
+      "description": "Item do catálogo de produtos Ambev",
+      "type": "object",
+      "properties": {
+        "code": { "type": "string" },
+        "description": { "type": "string" },
+        "category": { "type": "string" },
+        "palletFactor": { "type": "number" },
+        "lastroFactor": { "type": "number" },
+        "hectoliterFactor": { "type": "number" },
+        "price": { "type": "number" },
+        "abcClass": { "type": "string" }
+      }
+    },
+    "SupplierItem": {
+      "title": "SupplierItem",
+      "description": "Fábrica ou fornecedor cadastrado",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "code": { "type": "string" },
+        "name": { "type": "string" },
+        "type": { "type": "string" }
+      }
+    },
+    "UserAccount": {
+      "title": "UserAccount",
+      "description": "Conta de usuário do sistema NRI",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "username": { "type": "string" },
+        "fullName": { "type": "string" },
+        "role": { "type": "string" },
+        "unit": { "type": "string" },
+        "active": { "type": "boolean" }
+      }
+    },
+    "Report030519Item": {
+      "title": "Report030519Item",
+      "description": "Item do relatório de movimentação e Curva ABC 70/20/10",
+      "type": "object",
+      "properties": {
+        "productCode": { "type": "string" },
+        "description": { "type": "string" },
+        "monthlyMovement": { "type": "number" },
+        "cumulativeShare": { "type": "number" },
+        "abcClass": { "type": "string" },
+        "rank": { "type": "number" }
+      }
+    },
+    "BrandSettings": {
+      "title": "BrandSettings",
+      "description": "Configurações de logotipo e identidade visual",
+      "type": "object",
+      "properties": {
+        "companyName": { "type": "string" },
+        "primaryLogoUrl": { "type": "string" },
+        "secondaryLogoUrl": { "type": "string" }
+      }
+    }
+  },
+  "firestore": {
+    "/nri_pulls/{pullId}": {
+      "schema": { "$ref": "PullRecord" },
+      "description": "Coleção de puxadas de carretas e etiquetas emitidas"
+    },
+    "/nri_blitz/{blitzId}": {
+      "schema": { "$ref": "BlitzRecord" },
+      "description": "Coleção de registros de blitz e inspeção"
+    },
+    "/nri_pncs/{pncId}": {
+      "schema": { "$ref": "PNCRecord" },
+      "description": "Coleção de produtos não conformes"
+    },
+    "/nri_product_catalog/{prodId}": {
+      "schema": { "$ref": "ProductCatalogItem" },
+      "description": "Coleção de produtos e fatores de paletização"
+    },
+    "/nri_suppliers/{supplierId}": {
+      "schema": { "$ref": "SupplierItem" },
+      "description": "Coleção de fornecedores e fábricas"
+    },
+    "/nri_users/{userId}": {
+      "schema": { "$ref": "UserAccount" },
+      "description": "Coleção de contas e credenciais de usuários"
+    },
+    "/nri_report_030519/{itemId}": {
+      "schema": { "$ref": "Report030519Item" },
+      "description": "Coleção de itens do relatório 03.05.19"
+    },
+    "/nri_branding_settings/{docId}": {
+      "schema": { "$ref": "BrandSettings" },
+      "description": "Configurações de identidade visual"
+    }
+  }
+}

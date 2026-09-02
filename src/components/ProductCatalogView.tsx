@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useRef } from 'react';
+import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { 
   Package, 
   Search, 
@@ -21,16 +21,25 @@ import {
   Layers,
   Database,
   ShieldCheck,
-  Key
+  Key,
+  Building2,
+  Factory
 } from 'lucide-react';
-import { ProductCatalogItem, ABCClass, PullRecord, Report030519Item, BlitzPalletRecord, PNCRecord } from '../types';
+import { ProductCatalogItem, ABCClass, PullRecord, Report030519Item, BlitzPalletRecord, PNCRecord, SupplierItem } from '../types';
 import { formatBRL, getAbcBadgeColor, exportAllSystemBasesToExcel, exportDataToExcel } from '../utils/nriCalculations';
 import { PauBrasilLogo } from './PauBrasilLogo';
 import { INITIAL_PRODUCTS } from '../data/initialCatalog';
+import { SupplierManagementView } from './SupplierManagementView';
+import { getStoredBrandSettings, saveStoredBrandSettings, BrandSettings } from '../utils/branding';
+import { saveBrandSettingsToFirestore } from '../services/firebase';
 
 interface ProductCatalogViewProps {
   catalog: ProductCatalogItem[];
   onUpdateCatalog: (newCatalog: ProductCatalogItem[]) => void;
+  suppliers?: SupplierItem[];
+  onSaveSupplier?: (supplier: SupplierItem) => void;
+  onDeleteSupplier?: (supplierId: string) => void;
+  onResetSuppliers?: () => void;
   pulls?: PullRecord[];
   report030519?: Report030519Item[];
   blitzRecords?: BlitzPalletRecord[];
@@ -46,6 +55,10 @@ interface ProductCatalogViewProps {
 export const ProductCatalogView: React.FC<ProductCatalogViewProps> = ({
   catalog,
   onUpdateCatalog,
+  suppliers = [],
+  onSaveSupplier,
+  onDeleteSupplier,
+  onResetSuppliers,
   pulls = [],
   report030519 = [],
   blitzRecords = [],
@@ -57,11 +70,23 @@ export const ProductCatalogView: React.FC<ProductCatalogViewProps> = ({
   onOpenBrandingModal,
   onNavigateToUsers
 }) => {
+  const [activeSubTab, setActiveSubTab] = useState<'products' | 'suppliers' | 'branding'>('products');
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedAbc, setSelectedAbc] = useState<'ALL' | ABCClass>('ALL');
   const [selectedCategory, setSelectedCategory] = useState<string>('ALL');
   const [showInlineCreate, setShowInlineCreate] = useState(false);
   const [exportSuccessMsg, setExportSuccessMsg] = useState<string | null>(null);
+  const [brandSettings, setBrandSettings] = useState<BrandSettings>(getStoredBrandSettings);
+
+  useEffect(() => {
+    const handleUpdate = () => setBrandSettings(getStoredBrandSettings());
+    window.addEventListener('brand_settings_updated', handleUpdate);
+    window.addEventListener('storage', handleUpdate);
+    return () => {
+      window.removeEventListener('brand_settings_updated', handleUpdate);
+      window.removeEventListener('storage', handleUpdate);
+    };
+  }, []);
 
   const ambevInputRef = useRef<HTMLInputElement>(null);
   const pauBrasilInputRef = useRef<HTMLInputElement>(null);
@@ -81,8 +106,19 @@ export const ProductCatalogView: React.FC<ProductCatalogViewProps> = ({
     palletFactor: 120,
     lastroFactor: 12,
     abcClass: 'A',
-    defaultShelfLifeDays: 180
+    defaultShelfLifeDays: 180,
+    packaging: '',
+    factorSKU: 12,
+    unitPrice: 0
   });
+
+  const [currentPage, setCurrentPage] = useState<number>(1);
+  const [pageSize, setPageSize] = useState<number>(50);
+
+  // Reset to first page whenever search or filter changes
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, selectedAbc, selectedCategory, pageSize]);
 
   const categories = useMemo(() => {
     const set = new Set<string>();
@@ -105,6 +141,7 @@ export const ProductCatalogView: React.FC<ProductCatalogViewProps> = ({
         const matches = 
           p.code.toLowerCase().includes(q) || 
           p.description.toLowerCase().includes(q) ||
+          (p.packaging && p.packaging.toLowerCase().includes(q)) ||
           (p.category && p.category.toLowerCase().includes(q));
         if (!matches) return false;
       }
@@ -113,6 +150,13 @@ export const ProductCatalogView: React.FC<ProductCatalogViewProps> = ({
       return true;
     });
   }, [catalog, searchTerm, selectedAbc, selectedCategory]);
+
+  const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
+  const paginatedItems = useMemo(() => {
+    if (pageSize >= 1000) return filtered;
+    const start = (currentPage - 1) * pageSize;
+    return filtered.slice(start, start + pageSize);
+  }, [filtered, currentPage, pageSize]);
 
   const handleSaveEdit = () => {
     if (!editingItem) return;
@@ -157,27 +201,75 @@ export const ProductCatalogView: React.FC<ProductCatalogViewProps> = ({
       unit: 'cx12',
       category: 'Cerveja',
       price: 35.00,
+      unitPrice: 0,
       hectoliterFactor: 0.04,
       palletFactor: 120,
       lastroFactor: 12,
+      factorSKU: 12,
+      packaging: '',
       abcClass: 'A',
       defaultShelfLifeDays: 180
     });
   };
 
   const handleResetCatalogToDefault = () => {
-    if (window.confirm('Deseja restaurar a base de produtos original com todos os 117+ itens da Ambev?')) {
+    if (window.confirm('Deseja restaurar a base de produtos padrão atualizada com todos os 377+ itens da Ambev, com fatores de Pallet, Lastro, Hectolitro e Preços?')) {
       onUpdateCatalog(INITIAL_PRODUCTS);
+      setExportSuccessMsg('Base de produtos restaurada com sucesso com todos os 377 SKUs padrão!');
+      setTimeout(() => setExportSuccessMsg(null), 4000);
+    }
+  };
+
+  const handleSyncNewFactors = () => {
+    if (window.confirm(`Deseja sincronizar e atualizar os fatores (Hectolitro, Pallet, Lastro, Preço Total, Preço Unitário, Embalagem e Idade) de todos os 377+ produtos da base oficial Ambev? Quaisquer SKUs personalizados adicionados serão preservados.`)) {
+      const map = new Map<string, ProductCatalogItem>();
+      INITIAL_PRODUCTS.forEach(p => map.set(p.code, p));
+      catalog.forEach(p => {
+        const def = INITIAL_PRODUCTS.find(i => i.code === p.code);
+        if (def) {
+          map.set(p.code, {
+            ...p,
+            hectoliterFactor: def.hectoliterFactor,
+            palletFactor: def.palletFactor,
+            lastroFactor: def.lastroFactor,
+            price: def.price,
+            unitPrice: def.unitPrice,
+            factorSKU: def.factorSKU,
+            packaging: def.packaging,
+            defaultShelfLifeDays: def.defaultShelfLifeDays || p.defaultShelfLifeDays,
+            category: def.category || p.category
+          });
+        } else {
+          map.set(p.code, p);
+        }
+      });
+      const updated = Array.from(map.values()).sort((a, b) => (a.rank || 999) - (b.rank || 999));
+      onUpdateCatalog(updated);
+      setExportSuccessMsg('Base de produtos e fatores de paletização sincronizados com sucesso!');
+      setTimeout(() => setExportSuccessMsg(null), 4000);
     }
   };
 
   // Image Upload Handlers
   const handleAmbevLogoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file && onUpdateAmbevLogo) {
+    if (file) {
+      if (!file.type.startsWith('image/')) {
+        alert('Por favor, selecione um arquivo de imagem válido (PNG, JPG, SVG, WebP).');
+        return;
+      }
       const reader = new FileReader();
       reader.onload = () => {
-        onUpdateAmbevLogo(reader.result as string);
+        const dataUrl = reader.result as string;
+        const updated = { ...brandSettings, secondaryLogoUrl: dataUrl };
+        setBrandSettings(updated);
+        saveStoredBrandSettings(updated);
+        saveBrandSettingsToFirestore(updated).catch(err => console.error('Firestore brand sync error:', err));
+        if (onUpdateAmbevLogo) {
+          onUpdateAmbevLogo(dataUrl);
+        }
+        setExportSuccessMsg('Logotipo da Ambev atualizado com sucesso em toda a plataforma!');
+        setTimeout(() => setExportSuccessMsg(null), 4000);
       };
       reader.readAsDataURL(file);
     }
@@ -185,13 +277,46 @@ export const ProductCatalogView: React.FC<ProductCatalogViewProps> = ({
 
   const handlePauBrasilLogoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file && onUpdatePauBrasilLogo) {
+    if (file) {
+      if (!file.type.startsWith('image/')) {
+        alert('Por favor, selecione um arquivo de imagem válido (PNG, JPG, SVG, WebP).');
+        return;
+      }
       const reader = new FileReader();
       reader.onload = () => {
-        onUpdatePauBrasilLogo(reader.result as string);
+        const dataUrl = reader.result as string;
+        const updated = { ...brandSettings, primaryLogoUrl: dataUrl };
+        setBrandSettings(updated);
+        saveStoredBrandSettings(updated);
+        saveBrandSettingsToFirestore(updated).catch(err => console.error('Firestore brand sync error:', err));
+        if (onUpdatePauBrasilLogo) {
+          onUpdatePauBrasilLogo(dataUrl);
+        }
+        setExportSuccessMsg('Logotipo da Pau Brasil atualizado com sucesso em toda a plataforma!');
+        setTimeout(() => setExportSuccessMsg(null), 4000);
       };
       reader.readAsDataURL(file);
     }
+  };
+
+  const handleResetPauBrasilLogo = () => {
+    const updated = { ...brandSettings, primaryLogoUrl: null };
+    setBrandSettings(updated);
+    saveStoredBrandSettings(updated);
+    saveBrandSettingsToFirestore(updated).catch(err => console.error('Firestore brand sync error:', err));
+    if (onUpdatePauBrasilLogo) onUpdatePauBrasilLogo(null);
+    setExportSuccessMsg('Logotipo padrão da Pau Brasil restaurado com sucesso!');
+    setTimeout(() => setExportSuccessMsg(null), 3000);
+  };
+
+  const handleResetAmbevLogo = () => {
+    const updated = { ...brandSettings, secondaryLogoUrl: null };
+    setBrandSettings(updated);
+    saveStoredBrandSettings(updated);
+    saveBrandSettingsToFirestore(updated).catch(err => console.error('Firestore brand sync error:', err));
+    if (onUpdateAmbevLogo) onUpdateAmbevLogo(null);
+    setExportSuccessMsg('Logotipo padrão da Ambev restaurado com sucesso!');
+    setTimeout(() => setExportSuccessMsg(null), 3000);
   };
 
   // Full Database Export
@@ -201,7 +326,8 @@ export const ProductCatalogView: React.FC<ProductCatalogViewProps> = ({
       pulls,
       blitzRecords,
       pncs,
-      report030519
+      report030519,
+      suppliers
     });
     setExportSuccessMsg('Backup de todas as bases de dados exportado com sucesso no formato Excel (.xlsx)!');
     setTimeout(() => setExportSuccessMsg(null), 4000);
@@ -238,11 +364,11 @@ export const ProductCatalogView: React.FC<ProductCatalogViewProps> = ({
                 GUIA DE CADASTROS & GESTÃO DE DADOS
               </h1>
               <span className="text-xs bg-slate-900 text-amber-400 font-mono font-bold px-2.5 py-0.5 rounded-full">
-                {stats.total} SKUs CADASTRADOS
+                {stats.total} SKUs • {suppliers.length} FORNECEDORES
               </span>
             </div>
             <p className="text-xs text-slate-500 font-medium mt-0.5">
-              Gerenciamento de produtos, fatores de paletização, Curva ABC (70/20/10), logos e exportação de todas as bases.
+              Gerenciamento de produtos, fábricas e fornecedores, fatores de paletização, Curva ABC (70/20/10) e logos.
             </p>
           </div>
         </div>
@@ -264,30 +390,44 @@ export const ProductCatalogView: React.FC<ProductCatalogViewProps> = ({
             type="button"
             onClick={handleExportAllDatabases}
             className="flex items-center gap-1.5 px-3.5 py-2 bg-emerald-700 hover:bg-emerald-800 text-white font-bold rounded-xl text-xs transition-all shadow-sm active:scale-95"
-            title="Exportar Todas as Bases da Plataforma (Cadastros, Puxadas, 03.05.19, Blitz, PNC)"
+            title="Exportar Todas as Bases da Plataforma (Cadastros, Fornecedores, Puxadas, 03.05.19, Blitz, PNC)"
           >
             <Database className="w-4 h-4" />
             <span>Exportar Todas as Bases (.xlsx)</span>
           </button>
 
-          <button
-            type="button"
-            onClick={() => setShowInlineCreate(!showInlineCreate)}
-            className="flex items-center gap-1.5 px-4 py-2 bg-amber-500 hover:bg-amber-600 text-slate-950 font-black rounded-xl text-xs transition-all shadow-md active:scale-95"
-          >
-            <Plus className="w-4 h-4 stroke-[3]" />
-            <span>Novo Cadastro</span>
-            {showInlineCreate ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
-          </button>
+          {activeSubTab === 'products' && (
+            <>
+              <button
+                type="button"
+                onClick={handleSyncNewFactors}
+                className="flex items-center gap-1.5 px-3.5 py-2 bg-blue-700 hover:bg-blue-800 text-white font-bold rounded-xl text-xs transition-all shadow-sm active:scale-95 border border-blue-600"
+                title="Sincronizar Fatores de Pallet, Lastro, HL e Preços com a base oficial (377 SKUs)"
+              >
+                <Sparkles className="w-4 h-4 text-amber-300" />
+                <span>Sincronizar Fatores (377 SKUs)</span>
+              </button>
 
-          <button
-            type="button"
-            onClick={handleResetCatalogToDefault}
-            className="p-2 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-xl transition-colors text-xs flex items-center gap-1"
-            title="Restaurar Base Padrão Ambev"
-          >
-            <RotateCcw className="w-4 h-4" />
-          </button>
+              <button
+                type="button"
+                onClick={() => setShowInlineCreate(!showInlineCreate)}
+                className="flex items-center gap-1.5 px-4 py-2 bg-amber-500 hover:bg-amber-600 text-slate-950 font-black rounded-xl text-xs transition-all shadow-md active:scale-95"
+              >
+                <Plus className="w-4 h-4 stroke-[3]" />
+                <span>Novo SKU</span>
+                {showInlineCreate ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+              </button>
+
+              <button
+                type="button"
+                onClick={handleResetCatalogToDefault}
+                className="p-2 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-xl transition-colors text-xs flex items-center gap-1"
+                title="Restaurar Base Padrão Ambev (377 SKUs)"
+              >
+                <RotateCcw className="w-4 h-4" />
+              </button>
+            </>
+          )}
         </div>
       </div>
 
@@ -302,147 +442,214 @@ export const ProductCatalogView: React.FC<ProductCatalogViewProps> = ({
         </div>
       )}
 
-      {/* 2. LOGO UPLOAD & BRANDING SECTION (MOVED TO CADASTROS AS REQUESTED) */}
-      <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-2xs">
-        <div className="flex items-center justify-between mb-4 border-b border-slate-100 pb-3">
-          <div className="flex items-center gap-2">
-            <Image className="w-5 h-5 text-blue-600" />
-            <h2 className="font-black text-slate-900 text-sm uppercase tracking-tight font-mono">
-              Upload & Personalização de Logomarcas (Cabeçalho & NRI)
-            </h2>
-          </div>
-          <span className="text-xs text-slate-400 font-medium">Formatos aceitos: PNG, JPG, SVG, WebP</span>
-        </div>
+      {/* SUB-TABS NAVIGATION: PRODUTOS | FORNECEDORES | LOGOS */}
+      <div className="flex items-center gap-2 p-1.5 bg-slate-200/90 rounded-2xl border border-slate-300 w-fit">
+        <button
+          type="button"
+          onClick={() => setActiveSubTab('products')}
+          className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-black transition-all ${
+            activeSubTab === 'products'
+              ? 'bg-[#002B7F] text-white shadow-md'
+              : 'text-slate-700 hover:text-slate-900 hover:bg-white/60'
+          }`}
+        >
+          <Package className="w-4 h-4" />
+          <span>Catálogo de Produtos (SKUs)</span>
+          <span className={`text-[10px] px-2 py-0.5 rounded-full font-mono font-bold ${
+            activeSubTab === 'products' ? 'bg-amber-400 text-slate-950' : 'bg-slate-300 text-slate-700'
+          }`}>
+            {stats.total}
+          </span>
+        </button>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          
-          {/* PAU BRASIL LOGO */}
-          <div className="p-4 bg-slate-50 rounded-xl border border-slate-200 flex items-center justify-between gap-4">
-            <div className="flex items-center gap-3">
-              <div className="w-16 h-12 bg-white rounded-lg border border-slate-200 p-1 flex items-center justify-center overflow-hidden shadow-2xs">
-                {customPauBrasilLogo ? (
-                  <img src={customPauBrasilLogo} alt="Pau Brasil" className="max-h-full max-w-full object-contain" />
-                ) : (
-                  <PauBrasilLogo size="sm" />
-                )}
-              </div>
-              <div>
-                <h3 className="text-xs font-black text-slate-900">Logo Pau Brasil Distribuidora</h3>
-                <p className="text-[11px] text-slate-500">Exibida no topo e nas notas de recebimento (NRI)</p>
-              </div>
-            </div>
+        <button
+          type="button"
+          onClick={() => setActiveSubTab('suppliers')}
+          className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-black transition-all ${
+            activeSubTab === 'suppliers'
+              ? 'bg-[#002B7F] text-white shadow-md'
+              : 'text-slate-700 hover:text-slate-900 hover:bg-white/60'
+          }`}
+        >
+          <Building2 className="w-4 h-4" />
+          <span>Fábricas & Fornecedores</span>
+          <span className={`text-[10px] px-2 py-0.5 rounded-full font-mono font-bold ${
+            activeSubTab === 'suppliers' ? 'bg-amber-400 text-slate-950' : 'bg-slate-300 text-slate-700'
+          }`}>
+            {suppliers.length}
+          </span>
+        </button>
 
-            <div className="flex items-center gap-2">
-              <input
-                type="file"
-                ref={pauBrasilInputRef}
-                onChange={handlePauBrasilLogoChange}
-                accept="image/*"
-                className="hidden"
-              />
-              <button
-                type="button"
-                onClick={() => pauBrasilInputRef.current?.click()}
-                className="flex items-center gap-1 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold transition-all shadow-xs"
-              >
-                <Upload className="w-3.5 h-3.5" />
-                <span>Upload Logo</span>
-              </button>
-              {customPauBrasilLogo && (
-                <button
-                  type="button"
-                  onClick={() => onUpdatePauBrasilLogo?.(null)}
-                  className="p-1.5 text-slate-400 hover:text-red-600 rounded-lg text-xs"
-                  title="Restaurar padrão"
-                >
-                  <RotateCcw className="w-3.5 h-3.5" />
-                </button>
-              )}
-            </div>
-          </div>
-
-          {/* AMBEV LOGO */}
-          <div className="p-4 bg-slate-50 rounded-xl border border-slate-200 flex items-center justify-between gap-4">
-            <div className="flex items-center gap-3">
-              <div className="w-16 h-12 bg-slate-900 rounded-lg border border-slate-800 p-1 flex items-center justify-center overflow-hidden shadow-2xs">
-                {customAmbevLogo ? (
-                  <img src={customAmbevLogo} alt="Ambev" className="max-h-full max-w-full object-contain" />
-                ) : (
-                  <span className="font-black text-amber-400 tracking-tighter text-sm font-mono">ambev</span>
-                )}
-              </div>
-              <div>
-                <h3 className="text-xs font-black text-slate-900">Logo Ambev Oficial</h3>
-                <p className="text-[11px] text-slate-500">Exibida nos documentos operacionais e cabeçalho</p>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-2">
-              <input
-                type="file"
-                ref={ambevInputRef}
-                onChange={handleAmbevLogoChange}
-                accept="image/*"
-                className="hidden"
-              />
-              <button
-                type="button"
-                onClick={() => ambevInputRef.current?.click()}
-                className="flex items-center gap-1 px-3 py-1.5 bg-slate-800 hover:bg-slate-900 text-amber-400 rounded-xl text-xs font-bold transition-all shadow-xs"
-              >
-                <Upload className="w-3.5 h-3.5" />
-                <span>Upload Logo</span>
-              </button>
-              {customAmbevLogo && (
-                <button
-                  type="button"
-                  onClick={() => onUpdateAmbevLogo?.(null)}
-                  className="p-1.5 text-slate-400 hover:text-red-600 rounded-lg text-xs"
-                  title="Restaurar padrão"
-                >
-                  <RotateCcw className="w-3.5 h-3.5" />
-                </button>
-              )}
-            </div>
-          </div>
-
-        </div>
+        <button
+          type="button"
+          onClick={() => setActiveSubTab('branding')}
+          className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-black transition-all ${
+            activeSubTab === 'branding'
+              ? 'bg-[#002B7F] text-white shadow-md'
+              : 'text-slate-700 hover:text-slate-900 hover:bg-white/60'
+          }`}
+        >
+          <Image className="w-4 h-4" />
+          <span>Logomarcas & Identidade</span>
+        </button>
       </div>
 
-      {/* 3. CURVA ABC PARETO 70/20/10 STATS CARDS */}
-      <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
-        <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-2xs flex items-center justify-between">
-          <div>
-            <div className="text-[10px] font-black uppercase text-slate-400">Total de Produtos</div>
-            <div className="text-xl font-black text-slate-900 font-mono">{stats.total} SKUs</div>
-          </div>
-          <Package className="w-6 h-6 text-slate-400" />
-        </div>
+      {/* VIEW 1: FÁBRICAS & FORNECEDORES TAB */}
+      {activeSubTab === 'suppliers' && (
+        <SupplierManagementView 
+          suppliers={suppliers}
+          onSaveSupplier={onSaveSupplier || (() => {})}
+          onDeleteSupplier={onDeleteSupplier || (() => {})}
+          onResetSuppliers={onResetSuppliers}
+        />
+      )}
 
-        <div className="bg-white p-4 rounded-xl border border-emerald-200 bg-emerald-50/20 shadow-2xs flex items-center justify-between">
-          <div>
-            <div className="text-[10px] font-black uppercase text-emerald-800">Curva A (70% Volume)</div>
-            <div className="text-xl font-black text-emerald-700 font-mono">{stats.countA} SKUs</div>
+      {/* VIEW 2: LOGOS & BRANDING TAB */}
+      {activeSubTab === 'branding' && (
+        <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-2xs">
+          <div className="flex items-center justify-between mb-4 border-b border-slate-100 pb-3">
+            <div className="flex items-center gap-2">
+              <Image className="w-5 h-5 text-blue-600" />
+              <h2 className="font-black text-slate-900 text-sm uppercase tracking-tight font-mono">
+                Upload & Personalização de Logomarcas (Cabeçalho & NRI)
+              </h2>
+            </div>
+            <span className="text-xs text-slate-400 font-medium">Formatos aceitos: PNG, JPG, SVG, WebP</span>
           </div>
-          <span className="w-7 h-7 rounded-lg bg-emerald-600 text-white font-black flex items-center justify-center text-sm shadow-xs">A</span>
-        </div>
 
-        <div className="bg-white p-4 rounded-xl border border-amber-200 bg-amber-50/20 shadow-2xs flex items-center justify-between">
-          <div>
-            <div className="text-[10px] font-black uppercase text-amber-800">Curva B (20% Volume)</div>
-            <div className="text-xl font-black text-amber-700 font-mono">{stats.countB} SKUs</div>
-          </div>
-          <span className="w-7 h-7 rounded-lg bg-amber-500 text-slate-950 font-black flex items-center justify-center text-sm shadow-xs">B</span>
-        </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            
+            {/* PAU BRASIL LOGO */}
+            <div className="p-4 bg-slate-50 rounded-xl border border-slate-200 flex items-center justify-between gap-4">
+              <div className="flex items-center gap-3">
+                <div className="w-16 h-12 bg-white rounded-lg border border-slate-200 p-1 flex items-center justify-center overflow-hidden shadow-2xs">
+                  {brandSettings.primaryLogoUrl ? (
+                    <img src={brandSettings.primaryLogoUrl} alt="Pau Brasil" className="max-h-full max-w-full object-contain" />
+                  ) : (
+                    <PauBrasilLogo size="sm" />
+                  )}
+                </div>
+                <div>
+                  <h3 className="text-xs font-black text-slate-900">Logo Pau Brasil Distribuidora</h3>
+                  <p className="text-[11px] text-slate-500">Exibida no topo e nas notas de recebimento (NRI)</p>
+                </div>
+              </div>
 
-        <div className="bg-white p-4 rounded-xl border border-red-200 bg-red-50/20 shadow-2xs flex items-center justify-between">
-          <div>
-            <div className="text-[10px] font-black uppercase text-red-800">Curva C (10% Volume)</div>
-            <div className="text-xl font-black text-red-700 font-mono">{stats.countC} SKUs</div>
+              <div className="flex items-center gap-2">
+                <input
+                  type="file"
+                  ref={pauBrasilInputRef}
+                  onChange={handlePauBrasilLogoChange}
+                  accept="image/*"
+                  className="hidden"
+                />
+                <button
+                  type="button"
+                  onClick={() => pauBrasilInputRef.current?.click()}
+                  className="flex items-center gap-1 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold transition-all shadow-xs"
+                >
+                  <Upload className="w-3.5 h-3.5" />
+                  <span>Upload Logo</span>
+                </button>
+                {brandSettings.primaryLogoUrl && (
+                  <button
+                    type="button"
+                    onClick={handleResetPauBrasilLogo}
+                    className="p-1.5 text-slate-400 hover:text-red-600 rounded-lg text-xs"
+                    title="Restaurar padrão"
+                  >
+                    <RotateCcw className="w-3.5 h-3.5" />
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {/* AMBEV LOGO */}
+            <div className="p-4 bg-slate-50 rounded-xl border border-slate-200 flex items-center justify-between gap-4">
+              <div className="flex items-center gap-3">
+                <div className="w-16 h-12 bg-slate-900 rounded-lg border border-slate-800 p-1 flex items-center justify-center overflow-hidden shadow-2xs">
+                  {brandSettings.secondaryLogoUrl ? (
+                    <img src={brandSettings.secondaryLogoUrl} alt="Ambev" className="max-h-full max-w-full object-contain" />
+                  ) : (
+                    <span className="font-black text-amber-400 tracking-tighter text-sm font-mono">ambev</span>
+                  )}
+                </div>
+                <div>
+                  <h3 className="text-xs font-black text-slate-900">Logo Ambev Oficial</h3>
+                  <p className="text-[11px] text-slate-500">Exibida nos documentos operacionais e cabeçalho</p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <input
+                  type="file"
+                  ref={ambevInputRef}
+                  onChange={handleAmbevLogoChange}
+                  accept="image/*"
+                  className="hidden"
+                />
+                <button
+                  type="button"
+                  onClick={() => ambevInputRef.current?.click()}
+                  className="flex items-center gap-1 px-3 py-1.5 bg-slate-800 hover:bg-slate-900 text-amber-400 rounded-xl text-xs font-bold transition-all shadow-xs"
+                >
+                  <Upload className="w-3.5 h-3.5" />
+                  <span>Upload Logo</span>
+                </button>
+                {brandSettings.secondaryLogoUrl && (
+                  <button
+                    type="button"
+                    onClick={handleResetAmbevLogo}
+                    className="p-1.5 text-slate-400 hover:text-red-600 rounded-lg text-xs"
+                    title="Restaurar padrão"
+                  >
+                    <RotateCcw className="w-3.5 h-3.5" />
+                  </button>
+                )}
+              </div>
+            </div>
+
           </div>
-          <span className="w-7 h-7 rounded-lg bg-red-600 text-white font-black flex items-center justify-center text-sm shadow-xs">C</span>
         </div>
-      </div>
+      )}
+
+      {/* VIEW 3: PRODUCT CATALOG TAB */}
+      {activeSubTab === 'products' && (
+        <>
+          {/* 3. CURVA ABC PARETO 70/20/10 STATS CARDS */}
+          <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
+            <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-2xs flex items-center justify-between">
+              <div>
+                <div className="text-[10px] font-black uppercase text-slate-400">Total de Produtos</div>
+                <div className="text-xl font-black text-slate-900 font-mono">{stats.total} SKUs</div>
+              </div>
+              <Package className="w-6 h-6 text-slate-400" />
+            </div>
+
+            <div className="bg-white p-4 rounded-xl border border-emerald-200 bg-emerald-50/20 shadow-2xs flex items-center justify-between">
+              <div>
+                <div className="text-[10px] font-black uppercase text-emerald-800">Curva A (70% Volume)</div>
+                <div className="text-xl font-black text-emerald-700 font-mono">{stats.countA} SKUs</div>
+              </div>
+              <span className="w-7 h-7 rounded-lg bg-emerald-600 text-white font-black flex items-center justify-center text-sm shadow-xs">A</span>
+            </div>
+
+            <div className="bg-white p-4 rounded-xl border border-amber-200 bg-amber-50/20 shadow-2xs flex items-center justify-between">
+              <div>
+                <div className="text-[10px] font-black uppercase text-amber-800">Curva B (20% Volume)</div>
+                <div className="text-xl font-black text-amber-700 font-mono">{stats.countB} SKUs</div>
+              </div>
+              <span className="w-7 h-7 rounded-lg bg-amber-500 text-slate-950 font-black flex items-center justify-center text-sm shadow-xs">B</span>
+            </div>
+
+            <div className="bg-white p-4 rounded-xl border border-red-200 bg-red-50/20 shadow-2xs flex items-center justify-between">
+              <div>
+                <div className="text-[10px] font-black uppercase text-red-800">Curva C (10% Volume)</div>
+                <div className="text-xl font-black text-red-700 font-mono">{stats.countC} SKUs</div>
+              </div>
+              <span className="w-7 h-7 rounded-lg bg-red-600 text-white font-black flex items-center justify-center text-sm shadow-xs">C</span>
+            </div>
+          </div>
 
 
       {/* INLINE PRODUCT CREATION FORM (EXPANDABLE) */}
@@ -662,27 +869,29 @@ export const ProductCatalogView: React.FC<ProductCatalogViewProps> = ({
           <table className="w-full text-left text-xs border-collapse min-w-[1050px]">
             <thead>
               <tr className="bg-slate-50 text-slate-700 font-bold text-[11px] border-b border-slate-200 uppercase">
-                <th className="p-3 w-16 text-center">Rank</th>
-                <th className="p-3 w-28">Código SKU</th>
-                <th className="p-3 min-w-[280px]">Descrição do Produto</th>
+                <th className="p-3 w-14 text-center">Rank</th>
+                <th className="p-3 w-24">Código SKU</th>
+                <th className="p-3 min-w-[260px]">Descrição do Produto</th>
+                <th className="p-3 w-28">Embalagem</th>
                 <th className="p-3 w-20 text-center">Curva ABC</th>
-                <th className="p-3 w-20 text-center">Unidade</th>
-                <th className="p-3 w-28 text-center bg-amber-50/70 font-black text-amber-950 border-x border-amber-200">
-                  Fator Pallet (Plts)
+                <th className="p-3 w-16 text-center">Unidade</th>
+                <th className="p-3 w-24 text-center bg-amber-50/70 font-black text-amber-950 border-x border-amber-200">
+                  Fator Pallet
                 </th>
                 <th className="p-3 w-24 text-center bg-blue-50/70 font-black text-blue-950 border-r border-blue-200">
                   Fator Lastro
                 </th>
-                <th className="p-3 w-24 text-center">Fator HL</th>
-                <th className="p-3 w-24 text-right">Preço Unit.</th>
-                <th className="p-3 w-24 text-center">Validade Padrão</th>
-                <th className="p-3 w-24 text-center">Ações</th>
+                <th className="p-3 w-20 text-center bg-slate-100 font-bold">Fator HL</th>
+                <th className="p-3 w-24 text-right bg-emerald-50/70 font-bold text-emerald-950">Preço Caixa</th>
+                <th className="p-3 w-24 text-right text-slate-700">Preço Unit.</th>
+                <th className="p-3 w-20 text-center">Validade</th>
+                <th className="p-3 w-20 text-center">Ações</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 text-slate-800">
-              {filtered.length === 0 ? (
+              {paginatedItems.length === 0 ? (
                 <tr>
-                  <td colSpan={11} className="p-8 text-center text-slate-400">
+                  <td colSpan={13} className="p-8 text-center text-slate-400">
                     <p className="font-semibold text-slate-600">Nenhum produto encontrado com os filtros selecionados.</p>
                     <button
                       type="button"
@@ -694,10 +903,10 @@ export const ProductCatalogView: React.FC<ProductCatalogViewProps> = ({
                   </td>
                 </tr>
               ) : (
-                filtered.map((item, idx) => (
+                paginatedItems.map((item, idx) => (
                   <tr key={item.code} className="hover:bg-slate-50 transition-colors">
                     <td className="p-3 text-center font-mono text-slate-400 font-bold">
-                      {item.rank || idx + 1}
+                      {item.rank || ((currentPage - 1) * pageSize + idx + 1)}
                     </td>
                     <td className="p-3">
                       <span className="inline-block font-mono font-black text-slate-900 bg-slate-100 px-2 py-0.5 rounded border border-slate-300 text-xs">
@@ -707,6 +916,9 @@ export const ProductCatalogView: React.FC<ProductCatalogViewProps> = ({
                     <td className="p-3 font-semibold text-slate-900">
                       <div>{item.description}</div>
                       <div className="text-[10px] text-slate-400 font-mono mt-0.5">{item.category || 'Geral'}</div>
+                    </td>
+                    <td className="p-3 font-mono text-xs text-slate-600">
+                      {item.packaging || '-'}
                     </td>
                     <td className="p-3 text-center">
                       <span 
@@ -728,11 +940,14 @@ export const ProductCatalogView: React.FC<ProductCatalogViewProps> = ({
                     <td className="p-3 text-center font-mono font-black text-blue-800 bg-blue-50/40 border-r border-blue-100">
                       {item.lastroFactor}
                     </td>
-                    <td className="p-3 text-center font-mono text-slate-700">
+                    <td className="p-3 text-center font-mono text-slate-700 bg-slate-50/50">
                       {item.hectoliterFactor}
                     </td>
-                    <td className="p-3 text-right font-mono text-slate-900 font-bold">
+                    <td className="p-3 text-right font-mono text-emerald-800 font-bold bg-emerald-50/30">
                       {formatBRL(item.price)}
+                    </td>
+                    <td className="p-3 text-right font-mono text-slate-700">
+                      {item.unitPrice ? formatBRL(item.unitPrice) : '-'}
                     </td>
                     <td className="p-3 text-center font-mono text-slate-600">
                       {item.defaultShelfLifeDays || 180} d
@@ -763,17 +978,83 @@ export const ProductCatalogView: React.FC<ProductCatalogViewProps> = ({
             </tbody>
           </table>
         </div>
+
+        {/* PAGINATION CONTROLS */}
+        {filtered.length > 0 && (
+          <div className="bg-slate-50 border-t border-slate-200 px-5 py-3 flex flex-wrap items-center justify-between gap-3 text-xs text-slate-600">
+            <div className="flex items-center gap-2">
+              <span>Exibindo <strong>{Math.min(filtered.length, (currentPage - 1) * pageSize + 1)}</strong> a <strong>{Math.min(filtered.length, currentPage * pageSize)}</strong> de <strong>{filtered.length}</strong> produtos</span>
+              <span className="text-slate-300">|</span>
+              <div className="flex items-center gap-1.5">
+                <span>Por página:</span>
+                <select
+                  value={pageSize}
+                  onChange={(e) => setPageSize(Number(e.target.value))}
+                  className="bg-white border border-slate-300 rounded px-2 py-1 text-xs font-bold text-slate-700"
+                >
+                  <option value={25}>25</option>
+                  <option value={50}>50</option>
+                  <option value={100}>100</option>
+                  <option value={200}>200</option>
+                  <option value={9999}>Todos ({filtered.length})</option>
+                </select>
+              </div>
+            </div>
+
+            {totalPages > 1 && (
+              <div className="flex items-center gap-1">
+                <button
+                  type="button"
+                  disabled={currentPage === 1}
+                  onClick={() => setCurrentPage(1)}
+                  className="px-2.5 py-1 rounded bg-white border border-slate-300 hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed font-bold"
+                >
+                  ««
+                </button>
+                <button
+                  type="button"
+                  disabled={currentPage === 1}
+                  onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                  className="px-2.5 py-1 rounded bg-white border border-slate-300 hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed font-bold"
+                >
+                  « Anterior
+                </button>
+                <span className="px-3 py-1 font-mono font-bold text-slate-800 bg-white border border-slate-200 rounded">
+                  Página {currentPage} de {totalPages}
+                </span>
+                <button
+                  type="button"
+                  disabled={currentPage === totalPages}
+                  onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                  className="px-2.5 py-1 rounded bg-white border border-slate-300 hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed font-bold"
+                >
+                  Próxima »
+                </button>
+                <button
+                  type="button"
+                  disabled={currentPage === totalPages}
+                  onClick={() => setCurrentPage(totalPages)}
+                  className="px-2.5 py-1 rounded bg-white border border-slate-300 hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed font-bold"
+                >
+                  »»
+                </button>
+              </div>
+            )}
+          </div>
+        )}
       </div>
+      </>
+      )}
 
       {/* EDIT MODAL - FULL FIELD PERMISSION TO EDIT */}
       {editingItem && (
         <div className="fixed inset-0 z-50 bg-slate-950/70 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white w-full max-w-lg rounded-2xl p-6 shadow-2xl space-y-4 border border-slate-200 animate-in fade-in zoom-in-95 duration-150">
+          <div className="bg-white w-full max-w-xl rounded-2xl p-6 shadow-2xl space-y-4 border border-slate-200 animate-in fade-in zoom-in-95 duration-150 max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between border-b border-slate-100 pb-3">
               <div className="flex items-center gap-2">
                 <Edit2 className="w-4 h-4 text-amber-500" />
                 <h3 className="text-base font-black text-slate-900">
-                  Editar Produto: SKU {editingItem.code}
+                  Editar Cadastro & Fatores: SKU {editingItem.code}
                 </h3>
               </div>
               <button 
@@ -831,6 +1112,30 @@ export const ProductCatalogView: React.FC<ProductCatalogViewProps> = ({
                 </div>
               </div>
 
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block font-bold text-slate-700 mb-1">Embalagem</label>
+                  <input
+                    type="text"
+                    value={editingItem.packaging || ''}
+                    onChange={(e) => setEditingItem({ ...editingItem, packaging: e.target.value })}
+                    placeholder="Ex: LATA 350ML, RETORNÁVEL 600ML"
+                    className="w-full bg-slate-50 border border-slate-300 rounded-lg p-2 font-mono font-semibold text-slate-800"
+                  />
+                </div>
+
+                <div>
+                  <label className="block font-bold text-slate-700 mb-1">Fator SKU (Unidades/Cx)</label>
+                  <input
+                    type="number"
+                    value={editingItem.factorSKU || 1}
+                    onChange={(e) => setEditingItem({ ...editingItem, factorSKU: Number(e.target.value) })}
+                    className="w-full bg-slate-50 border border-slate-300 rounded-lg p-2 font-mono font-bold"
+                  />
+                </div>
+              </div>
+
+              {/* HIGHLIGHTED PALLET & LASTRO FACTORS */}
               <div className="grid grid-cols-2 gap-3 p-3 bg-amber-50/50 rounded-xl border border-amber-200">
                 <div>
                   <label className="block font-black text-amber-900 mb-1">Fator Pallet (Plts)</label>
@@ -857,12 +1162,12 @@ export const ProductCatalogView: React.FC<ProductCatalogViewProps> = ({
                 </div>
               </div>
 
-              <div className="grid grid-cols-3 gap-3">
+              <div className="grid grid-cols-4 gap-3">
                 <div>
-                  <label className="block font-bold text-slate-700 mb-1">Fator Hectolitro (HL)</label>
+                  <label className="block font-bold text-slate-700 mb-1">Fator HL</label>
                   <input
                     type="number"
-                    step="0.01"
+                    step="0.0001"
                     value={editingItem.hectoliterFactor}
                     onChange={(e) => setEditingItem({ ...editingItem, hectoliterFactor: Number(e.target.value) })}
                     className="w-full bg-slate-50 border border-slate-300 rounded-lg p-2 font-mono font-bold"
@@ -870,18 +1175,29 @@ export const ProductCatalogView: React.FC<ProductCatalogViewProps> = ({
                 </div>
 
                 <div>
-                  <label className="block font-bold text-slate-700 mb-1">Preço Unitário (R$)</label>
+                  <label className="block font-bold text-slate-700 mb-1">Preço Caixa (R$)</label>
                   <input
                     type="number"
                     step="0.01"
                     value={editingItem.price}
                     onChange={(e) => setEditingItem({ ...editingItem, price: Number(e.target.value) })}
+                    className="w-full bg-slate-50 border border-slate-300 rounded-lg p-2 font-mono font-bold text-emerald-800"
+                  />
+                </div>
+
+                <div>
+                  <label className="block font-bold text-slate-700 mb-1">Preço Unit. (R$)</label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    value={editingItem.unitPrice || 0}
+                    onChange={(e) => setEditingItem({ ...editingItem, unitPrice: Number(e.target.value) })}
                     className="w-full bg-slate-50 border border-slate-300 rounded-lg p-2 font-mono font-bold"
                   />
                 </div>
 
                 <div>
-                  <label className="block font-bold text-slate-700 mb-1">Validade Padrão (Dias)</label>
+                  <label className="block font-bold text-slate-700 mb-1">Validade (Dias)</label>
                   <input
                     type="number"
                     value={editingItem.defaultShelfLifeDays || 180}

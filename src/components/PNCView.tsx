@@ -25,6 +25,7 @@ import {
 } from 'lucide-react';
 import { PNCRecord, PullRecord, ProductCatalogItem, UserAccount } from '../types';
 import { formatBRL, formatDateBR, formatHL, exportDataToExcel } from '../utils/nriCalculations';
+import { SupplierSearchCombobox } from './SupplierSearchCombobox';
 
 interface PNCViewProps {
   pncs: PNCRecord[];
@@ -647,18 +648,13 @@ export const PNCView: React.FC<PNCViewProps> = ({
 
                 <div>
                   <label className="block text-xs font-bold text-slate-700 mb-1">Fábrica Origem:</label>
-                  <select
+                  <SupplierSearchCombobox
                     value={factoryOrigin}
-                    onChange={(e) => setFactoryOrigin(e.target.value)}
-                    className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl text-xs font-bold"
-                  >
-                    <option value="F. Itapissuma">F. Itapissuma</option>
-                    <option value="F. Aquiraz">F. Aquiraz</option>
-                    <option value="F. Natal">F. Natal</option>
-                    <option value="F. Teresina">F. Teresina</option>
-                    <option value="F. Camaçari">F. Camaçari</option>
-                    <option value="F. Águas Claras">F. Águas Claras</option>
-                  </select>
+                    onChange={(val) => setFactoryOrigin(val)}
+                    placeholder="Digite ou selecione a fábrica..."
+                    showQuickChips={true}
+                    theme="light"
+                  />
                 </div>
               </div>
 

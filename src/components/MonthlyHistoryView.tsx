@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { 
   History, 
   Search, 
@@ -46,6 +46,8 @@ export const MonthlyHistoryView: React.FC<MonthlyHistoryViewProps> = ({
   });
 
   const [expandedPullId, setExpandedPullId] = useState<string | null>(null);
+  const [currentPage, setCurrentPage] = useState<number>(1);
+  const [pageSize, setPageSize] = useState<number>(20);
 
   // Available unique months from pulls
   const availableMonths = useMemo(() => {
@@ -102,6 +104,18 @@ export const MonthlyHistoryView: React.FC<MonthlyHistoryViewProps> = ({
       return true;
     });
   }, [pulls, filters]);
+
+  // Reset pagination on filter change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [filters, pageSize]);
+
+  const totalPages = Math.max(1, Math.ceil(filteredPulls.length / pageSize));
+  const paginatedPulls = useMemo(() => {
+    if (pageSize >= 1000) return filteredPulls;
+    const start = (currentPage - 1) * pageSize;
+    return filteredPulls.slice(start, start + pageSize);
+  }, [filteredPulls, currentPage, pageSize]);
 
   // Summary Metrics of filtered view
   const summary = useMemo(() => {
@@ -394,7 +408,7 @@ export const MonthlyHistoryView: React.FC<MonthlyHistoryViewProps> = ({
             <p className="text-xs text-slate-400 mt-1">Tente ajustar os termos de busca ou o período selecionado.</p>
           </div>
         ) : (
-          filteredPulls.map((pull) => {
+          paginatedPulls.map((pull) => {
             const isExpanded = expandedPullId === pull.header.id;
             
             return (
@@ -564,6 +578,70 @@ export const MonthlyHistoryView: React.FC<MonthlyHistoryViewProps> = ({
           })
         )}
       </div>
+
+      {/* PAGINATION CONTROLS */}
+      {filteredPulls.length > 0 && (
+        <div className="bg-white rounded-2xl border border-slate-200 p-4 flex flex-wrap items-center justify-between gap-3 text-xs text-slate-600 shadow-xs">
+          <div className="flex items-center gap-2">
+            <span>Exibindo <strong>{Math.min(filteredPulls.length, (currentPage - 1) * pageSize + 1)}</strong> a <strong>{Math.min(filteredPulls.length, currentPage * pageSize)}</strong> de <strong>{filteredPulls.length}</strong> puxadas</span>
+            <span className="text-slate-300">|</span>
+            <div className="flex items-center gap-1.5">
+              <span>Por página:</span>
+              <select
+                value={pageSize}
+                onChange={(e) => setPageSize(Number(e.target.value))}
+                className="bg-slate-50 border border-slate-300 rounded px-2 py-1 text-xs font-bold text-slate-700"
+              >
+                <option value={10}>10</option>
+                <option value={20}>20</option>
+                <option value={50}>50</option>
+                <option value={100}>100</option>
+                <option value={9999}>Todas ({filteredPulls.length})</option>
+              </select>
+            </div>
+          </div>
+
+          {totalPages > 1 && (
+            <div className="flex items-center gap-1">
+              <button
+                type="button"
+                disabled={currentPage === 1}
+                onClick={() => setCurrentPage(1)}
+                className="px-2.5 py-1 rounded bg-slate-50 border border-slate-300 hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed font-bold"
+              >
+                ««
+              </button>
+              <button
+                type="button"
+                disabled={currentPage === 1}
+                onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                className="px-2.5 py-1 rounded bg-slate-50 border border-slate-300 hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed font-bold"
+              >
+                « Anterior
+              </button>
+              <span className="px-3 py-1 font-mono font-bold text-slate-800 bg-slate-50 border border-slate-200 rounded">
+                Página {currentPage} de {totalPages}
+              </span>
+              <button
+                type="button"
+                disabled={currentPage === totalPages}
+                onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                className="px-2.5 py-1 rounded bg-slate-50 border border-slate-300 hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed font-bold"
+              >
+                Próxima »
+              </button>
+              <button
+                type="button"
+                disabled={currentPage === totalPages}
+                onClick={() => setCurrentPage(totalPages)}
+                className="px-2.5 py-1 rounded bg-slate-50 border border-slate-300 hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed font-bold"
+              >
+                »»
+              </button>
+            </div>
+          )}
+        </div>
+      )}
 
     </div>
   );

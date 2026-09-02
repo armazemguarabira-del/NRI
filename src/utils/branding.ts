@@ -34,6 +34,7 @@ export function saveStoredBrandSettings(settings: BrandSettings): void {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(settings));
     // Trigger custom event so all open tabs/components react immediately
     window.dispatchEvent(new Event('brand_settings_updated'));
+    window.dispatchEvent(new Event('storage'));
   } catch (err) {
     console.error('Error saving branding settings:', err);
   }
@@ -43,8 +44,10 @@ export function resetBrandSettings(): BrandSettings {
   try {
     localStorage.removeItem(STORAGE_KEY);
     window.dispatchEvent(new Event('brand_settings_updated'));
+    window.dispatchEvent(new Event('storage'));
   } catch (err) {
     console.error('Error resetting branding settings:', err);
   }
   return DEFAULT_BRAND_SETTINGS;
 }
+

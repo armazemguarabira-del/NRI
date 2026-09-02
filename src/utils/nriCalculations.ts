@@ -1,5 +1,6 @@
 import * as XLSX from 'xlsx';
-import { ProductCatalogItem, NRIItem, Report030519Item, ABCClass, ItemRiskLevel, PullRecord, BlitzPalletRecord, PNCRecord } from '../types';
+import { ProductCatalogItem, NRIItem, Report030519Item, ABCClass, ItemRiskLevel, PullRecord, BlitzPalletRecord, PNCRecord, SupplierItem } from '../types';
+import { INITIAL_PRODUCTS } from '../data/initialCatalog';
 
 export function calculateDateDiffDays(date1Str: string, date2Str: string): number {
   if (!date1Str || !date2Str) return 0;
@@ -46,29 +47,50 @@ export function recalculateItem(
   const lFactor = catalogItem?.lastroFactor || 10;
   const hFactor = catalogItem?.hectoliterFactor || 0.04;
   const price = catalogItem?.price || 0;
-  const releaseDays = item.releasePeriodDays ?? 40;
+  const releaseDays = item.releasePeriodDays ?? 30; // Pré-bloqueio é sempre 30 dias antes da validade
   const abc = catalogItem?.abcClass || item.abcClass || 'C';
 
   let qtySku = item.quantitySku ?? pFactor;
   let pallets = item.palletCount ?? 1;
-  let lastros = item.lastroCount ?? (pFactor / lFactor);
+  let lastros = lFactor; // Quantidade de SKU que vem no lastro (Fator Lastro, ex: 22 para 34608)
 
   if (triggerField === 'pallet') {
     pallets = Number(item.palletCount) || 0;
     qtySku = Math.round(pallets * pFactor);
-    lastros = lFactor > 0 ? Number((qtySku / lFactor).toFixed(1)) : 0;
+    lastros = lFactor;
   } else if (triggerField === 'lastro') {
-    lastros = Number(item.lastroCount) || 0;
-    qtySku = Math.round(lastros * lFactor);
+    const enteredLastroUnits = Number(item.lastroCount) || 1;
+    qtySku = Math.round(enteredLastroUnits * lFactor);
     pallets = pFactor > 0 ? Number((qtySku / pFactor).toFixed(2)) : 0;
+    lastros = lFactor;
   } else if (triggerField === 'sku') {
     qtySku = Number(item.quantitySku) || 0;
     pallets = pFactor > 0 ? Number((qtySku / pFactor).toFixed(2)) : 0;
-    lastros = lFactor > 0 ? Number((qtySku / lFactor).toFixed(1)) : 0;
+    lastros = lFactor;
   }
 
   const validity = item.validityDate || addDaysToDate(receiptDate || new Date().toISOString(), catalogItem?.defaultShelfLifeDays || 180);
   const daysToExpiry = calculateDateDiffDays(validity, receiptDate || new Date().toISOString().split('T')[0]);
+
+  // Idade do Produto (Shelf Life Total em Dias) & Stock Age Index (%) = (Dias Restantes ÷ Idade do Produto) × 100
+  let productShelfLifeDays = Number(catalogItem?.defaultShelfLifeDays) || Number(item.productShelfLifeDays) || 180;
+  if (item.manufacturingDate) {
+    const diffMfg = calculateDateDiffDays(validity, item.manufacturingDate);
+    if (diffMfg > 0) {
+      productShelfLifeDays = diffMfg;
+    }
+  }
+
+  // Stock Age Index (%)
+  const rawSai = productShelfLifeDays > 0 ? (daysToExpiry / productShelfLifeDays) * 100 : 100;
+  const stockAgeIndex = Number(Math.max(0, Math.min(100, rawSai)).toFixed(1));
+
+  // Faixas de classificação do Stock Age Index:
+  // 🔴 Crítico: SAI < 60%
+  // 🟡 Atenção: SAI entre 60% e 75%
+  // 🟢 OK: SAI > 75%
+  const saiClassification: 'CRÍTICO' | 'ATENÇÃO' | 'OK' = 
+    stockAgeIndex < 60 ? 'CRÍTICO' : stockAgeIndex <= 75 ? 'ATENÇÃO' : 'OK';
 
   // Venda média diária (cx/unidades por dia)
   let dailySalesAvg = 0;
@@ -107,39 +129,28 @@ export function recalculateItem(
   } else if (daysToExpiry < releaseDays) {
     status = 'CRÍTICO';
     baseRisk = 'Alto';
-    validityAlertObservation = `ALERTA CRÍTICO: Restam ${daysToExpiry} dias de validade (inferior ao prazo mínimo de liberação de ${releaseDays} dias).`;
-  } else if (isUnder60Days && hasRunoffRisk) {
-    status = 'CRÍTICO';
-    baseRisk = 'Alto';
-    validityAlertObservation = `ALERTA CRÍTICO: Validade curta (${daysToExpiry} dias <= 60d) E perigo de não escoar a tempo (venda média de ${dailySalesAvg} ${item.unit || 'cx'}/dia requer ~${neededRunoffDays} dias vs ${usefulDaysUntilPreBlock} dias úteis até o pré-bloqueio).`;
+    validityAlertObservation = `ALERTA CRÍTICO: Restam ${daysToExpiry} dias (inferior ao prazo de liberação de ${releaseDays} dias).`;
   } else if (isUnder60Days) {
     status = 'CRÍTICO';
     baseRisk = 'Alto';
-    validityAlertObservation = `ALERTA DE VALIDADE (<= 60 DIAS): Restam apenas ${daysToExpiry} dias para o vencimento. Prioridade máxima de carregamento/giro.`;
-  } else if (hasRunoffRisk) {
+    validityAlertObservation = `ALERTA CRÍTICO: Validade &le; 60 dias (restam ${daysToExpiry} dias, SAI: ${stockAgeIndex}%). Prioridade de carregamento.`;
+  } else if (daysToExpiry <= 90) { // < 3 meses (90 dias)
     status = 'ALERTA';
-    baseRisk = 'Alto';
-    if (neededRunoffDays > daysToExpiry) {
-      validityAlertObservation = `ALERTA GRAVE DE ESCOAMENTO: Venda média de ${dailySalesAvg} ${item.unit || 'cx'}/dia necessita de ~${neededRunoffDays} dias para escoar este volume (${qtySku} un), ultrapassando a validade total (${daysToExpiry} dias).`;
-    } else {
-      validityAlertObservation = `ALERTA DE ESCOAMENTO: Venda média de ${dailySalesAvg} ${item.unit || 'cx'}/dia necessita de ~${neededRunoffDays} dias para escoar este volume (${qtySku} un), excedendo o prazo útil antes do pré-bloqueio (${usefulDaysUntilPreBlock} dias úteis).`;
-    }
-  } else if (daysToExpiry <= 90) { // < 3 meses
-    status = 'ALERTA';
-    baseRisk = 'Alto';
-    validityAlertObservation = `ALERTA: Validade reduzida (${daysToExpiry} dias restantes, inferior a 90 dias).`;
-  } else if (daysToExpiry <= 120) {
+    baseRisk = hasRunoffRisk ? 'Alto' : 'Médio';
+    validityAlertObservation = `ALERTA: Validade reduzida (${daysToExpiry} dias restantes &le; 90 dias / 3 meses, SAI: ${stockAgeIndex}%).`;
+  } else if (hasRunoffRisk && neededRunoffDays > usefulDaysUntilPreBlock) {
     status = 'ALERTA';
     baseRisk = 'Médio';
-    validityAlertObservation = `ATENÇÃO: Validade de ${daysToExpiry} dias (giro estimado em ~${neededRunoffDays} dias pela venda média).`;
+    validityAlertObservation = `ALERTA DE ESCOAMENTO: Venda média de ${dailySalesAvg} ${item.unit || 'cx'}/dia necessita de ~${neededRunoffDays} dias para escoar.`;
   } else {
+    // Normal: mais de 90 dias / 3 meses
     status = 'OK';
     baseRisk = 'Baixo';
-    validityAlertObservation = `Validade regular (${daysToExpiry} dias). Escoamento previsto em ~${neededRunoffDays} dias (venda média: ${dailySalesAvg} ${item.unit || 'cx'}/dia).`;
+    validityAlertObservation = `Validade regular (${daysToExpiry} dias restantes, SAI ${stockAgeIndex}% - OK).`;
   }
 
-  // Pre-bloqueio: 40 dias antes do vencimento
-  const preBlockDate = subtractDaysFromDate(validity, releaseDays);
+  // Pre-bloqueio: SEMPRE 30 dias antes do vencimento
+  const preBlockDate = subtractDaysFromDate(validity, 30);
   // Carregamento até: 30 dias antes do vencimento
   const loadUntilDate = subtractDaysFromDate(validity, 30);
 
@@ -158,7 +169,7 @@ export function recalculateItem(
     validityDate: validity,
     manufacturingDate: item.manufacturingDate,
     status,
-    releasePeriodDays: releaseDays,
+    releasePeriodDays: 30,
     daysToExpiry,
     isPeriodOk,
     baseRisk,
@@ -168,14 +179,17 @@ export function recalculateItem(
     totalHectoliter,
     unitPrice: price,
     totalValue,
-    preBlockDate: item.preBlockDate || preBlockDate,
-    loadUntilDate: item.loadUntilDate || loadUntilDate,
+    preBlockDate: preBlockDate,
+    loadUntilDate: loadUntilDate,
     palletNumber: item.palletNumber || 1,
     dailySalesAvg,
     neededRunoffDays,
     hasRunoffRisk,
     isUnder60Days,
-    validityAlertObservation
+    validityAlertObservation,
+    productShelfLifeDays,
+    stockAgeIndex,
+    saiClassification
   };
 }
 
@@ -430,16 +444,19 @@ export function calculateParetoABC(
   // Update Product Catalog with new ABC classifications and ranks
   const updatedCatalog: ProductCatalogItem[] = currentCatalog.map(prod => {
     const abcInfo = productAbcMap.get(prod.code);
-    if (abcInfo) {
-      return {
-        ...prod,
-        abcClass: abcInfo.abc,
-        rank: abcInfo.rank,
-        monthlyMovement: volumeMap.get(prod.code)?.totalMovement || prod.monthlyMovement,
-        cumulativeShare: abcInfo.cumulativePct
-      };
-    }
-    return prod;
+    const initialPreset = INITIAL_PRODUCTS.find(i => i.code === prod.code);
+    return {
+      ...prod,
+      palletFactor: prod.palletFactor || initialPreset?.palletFactor || 100,
+      lastroFactor: prod.lastroFactor || initialPreset?.lastroFactor || 10,
+      hectoliterFactor: prod.hectoliterFactor || initialPreset?.hectoliterFactor || 0.04,
+      price: prod.price || initialPreset?.price || 35.00,
+      unitPrice: prod.unitPrice || initialPreset?.unitPrice || 2.50,
+      abcClass: abcInfo?.abc || prod.abcClass || 'C',
+      rank: abcInfo?.rank || prod.rank,
+      monthlyMovement: volumeMap.get(prod.code)?.totalMovement || prod.monthlyMovement,
+      cumulativeShare: abcInfo?.cumulativePct || prod.cumulativeShare
+    };
   });
 
   // Also add any new products from the report that were not in catalog
@@ -447,18 +464,22 @@ export function calculateParetoABC(
     const exists = updatedCatalog.some(p => p.code === code);
     if (!exists && data.name) {
       const abcInfo = productAbcMap.get(code);
+      const initialPreset = INITIAL_PRODUCTS.find(i => i.code === code);
       updatedCatalog.push({
         code,
         description: data.name,
-        unit: data.unit || 'cx',
-        category: 'Ambev Fabril',
-        price: 35.00,
-        hectoliterFactor: 0.04,
-        palletFactor: 100,
-        lastroFactor: 10,
+        unit: data.unit || initialPreset?.unit || 'cx',
+        category: initialPreset?.category || 'Ambev Fabril',
+        price: initialPreset?.price || 35.00,
+        unitPrice: initialPreset?.unitPrice || 2.50,
+        hectoliterFactor: initialPreset?.hectoliterFactor || 0.04,
+        palletFactor: initialPreset?.palletFactor || 100,
+        lastroFactor: initialPreset?.lastroFactor || 10,
         abcClass: abcInfo?.abc || 'C',
         rank: abcInfo?.rank,
-        defaultShelfLifeDays: 180,
+        defaultShelfLifeDays: initialPreset?.defaultShelfLifeDays || 180,
+        packaging: initialPreset?.packaging || '',
+        factorSKU: initialPreset?.factorSKU || 12,
         monthlyMovement: data.totalMovement,
         cumulativeShare: abcInfo?.cumulativePct
       });
@@ -762,6 +783,7 @@ export function exportAllSystemBasesToExcel(params: {
   blitzRecords: BlitzPalletRecord[];
   pncs: PNCRecord[];
   report030519: Report030519Item[];
+  suppliers?: SupplierItem[];
 }) {
   const wb = XLSX.utils.book_new();
 
@@ -896,5 +918,183 @@ export function exportAllSystemBasesToExcel(params: {
   const wsReport = XLSX.utils.json_to_sheet(reportRows);
   XLSX.utils.book_append_sheet(wb, wsReport, '5_030519_Escoamento');
 
+  // 6. Fábricas & Fornecedores
+  if (params.suppliers && params.suppliers.length > 0) {
+    const supplierRows = params.suppliers.map(s => ({
+      'Código': s.code,
+      'Nome / Razão Social': s.name,
+      'Tipo': s.type,
+      'Localização / UF': s.location || '-',
+      'Status': s.active ? 'Ativo' : 'Inativo',
+      'Observações': s.notes || '-'
+    }));
+    const wsSuppliers = XLSX.utils.json_to_sheet(supplierRows);
+    XLSX.utils.book_append_sheet(wb, wsSuppliers, '6_Fornecedores_Fabricantes');
+  }
+
   XLSX.writeFile(wb, `BACKUP_COMPLETO_NRI_AMBEV_${new Date().toISOString().split('T')[0]}.xlsx`);
 }
+
+/**
+ * Parses a simple 3-column ABC Curve Excel/CSV file containing:
+ * - Código (Product Code / SKU)
+ * - Descrição (Product Description / Name)
+ * - Curva (A, B, or C)
+ */
+export async function parseSimpleAbcCurveExcel(file: File): Promise<{
+  items: { rank: number; code: string; description: string; abcClass: 'A' | 'B' | 'C' }[];
+  summary: { total: number; countA: number; countB: number; countC: number; invalidCount: number };
+}> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+
+    reader.onload = (e) => {
+      try {
+        const data = new Uint8Array(e.target?.result as ArrayBuffer);
+        const workbook = XLSX.read(data, { type: 'array' });
+        const firstSheetName = workbook.SheetNames[0];
+        const worksheet = workbook.Sheets[firstSheetName];
+        
+        // Read as array of arrays or json
+        const rows: any[] = XLSX.utils.sheet_to_json(worksheet, { header: 1, defval: '' });
+
+        if (!rows || rows.length === 0) {
+          throw new Error('O arquivo está vazio.');
+        }
+
+        // Find header row or assume first row
+        let headerRowIdx = 0;
+        let codeColIdx = -1;
+        let descColIdx = -1;
+        let curveColIdx = -1;
+
+        // Try to locate columns by name in the first 5 rows
+        for (let r = 0; r < Math.min(rows.length, 5); r++) {
+          const row = rows[r];
+          if (!Array.isArray(row)) continue;
+
+          for (let c = 0; c < row.length; c++) {
+            const val = String(row[c] || '').trim().toUpperCase();
+            if (['CODIGO', 'CÓDIGO', 'SKU', 'COD', 'COD_PRODUTO', 'PRODUTO_COD', 'ITEM'].includes(val)) {
+              codeColIdx = c;
+              headerRowIdx = r;
+            } else if (['DESCRICAO', 'DESCRIÇÃO', 'PRODUTO', 'NOME', 'DESC', 'NOME DO PRODUTO'].includes(val)) {
+              descColIdx = c;
+              headerRowIdx = r;
+            } else if (['CURVA', 'CURVA ABC', 'ABC', 'CLASSE', 'CLASSIFICACAO', 'CLASSIFICAÇÃO'].includes(val)) {
+              curveColIdx = c;
+              headerRowIdx = r;
+            }
+          }
+
+          if (codeColIdx !== -1 && curveColIdx !== -1) {
+            break;
+          }
+        }
+
+        // Fallback: If headers were not found by text, assume Col 0 = Código, Col 1 = Descrição, Col 2 = Curva
+        if (codeColIdx === -1 || curveColIdx === -1) {
+          codeColIdx = 0;
+          descColIdx = 1;
+          curveColIdx = 2;
+          // Check if first row contains non-data header text
+          const firstVal = String(rows[0][0] || '').trim().toUpperCase();
+          if (firstVal.includes('COD') || isNaN(Number(firstVal))) {
+            headerRowIdx = 0;
+          } else {
+            headerRowIdx = -1; // No header, start from 0
+          }
+        }
+
+        if (descColIdx === -1) {
+          descColIdx = codeColIdx === 0 ? 1 : 0;
+        }
+
+        const items: { rank: number; code: string; description: string; abcClass: 'A' | 'B' | 'C' }[] = [];
+        let countA = 0;
+        let countB = 0;
+        let countC = 0;
+        let invalidCount = 0;
+
+        for (let i = headerRowIdx + 1; i < rows.length; i++) {
+          const row = rows[i];
+          if (!row || !Array.isArray(row) || row.length === 0) continue;
+
+          const rawCode = String(row[codeColIdx] || '').trim().replace(/^'+/, '');
+          const rawDesc = String(row[descColIdx] || '').trim();
+          let rawCurve = String(row[curveColIdx] || '').trim().toUpperCase();
+
+          // Ignore blank rows
+          if (!rawCode && !rawDesc) continue;
+
+          // Normalize curve value (extract first letter A, B, or C)
+          let abcClass: 'A' | 'B' | 'C' = 'C';
+          if (rawCurve.startsWith('A')) {
+            abcClass = 'A';
+            countA++;
+          } else if (rawCurve.startsWith('B')) {
+            abcClass = 'B';
+            countB++;
+          } else if (rawCurve.startsWith('C')) {
+            abcClass = 'C';
+            countC++;
+          } else {
+            // Default to C if unspecified or unrecognized
+            abcClass = 'C';
+            invalidCount++;
+            countC++;
+          }
+
+          if (rawCode) {
+            items.push({
+              rank: items.length + 1,
+              code: rawCode,
+              description: rawDesc || `PRODUTO ${rawCode}`,
+              abcClass
+            });
+          }
+        }
+
+        resolve({
+          items,
+          summary: {
+            total: items.length,
+            countA,
+            countB,
+            countC,
+            invalidCount
+          }
+        });
+      } catch (err: any) {
+        reject(new Error(err.message || 'Erro ao processar planilha Excel'));
+      }
+    };
+
+    reader.onerror = () => reject(new Error('Erro ao ler arquivo'));
+    reader.readAsArrayBuffer(file);
+  });
+}
+
+/**
+ * Generates and triggers download of a standardized 3-column ABC Curve template
+ */
+export function downloadAbcCurveTemplate(): void {
+  const data = [
+    { 'CÓDIGO': '34608', 'DESCRIÇÃO': 'SKOL LATA 350ML SH C/12 NPAL MULTIPACK', 'CURVA': 'A' },
+    { 'CÓDIGO': '9067', 'DESCRIÇÃO': 'ANTARCTICA PILSEN LATA 350ML SH C/12 NPAL', 'CURVA': 'A' },
+    { 'CÓDIGO': '37450', 'DESCRIÇÃO': 'BUDWEISER LT SLEEK 350ML SH C 12 MULTIPACK', 'CURVA': 'A' },
+    { 'CÓDIGO': '19164', 'DESCRIÇÃO': 'GUARANA CHP ANTARCTICA PET 1L PACK C/2 MULTPACK', 'CURVA': 'B' },
+    { 'CÓDIGO': '33857', 'DESCRIÇÃO': 'STELLA ARTOIS PURE GOLD 600ML', 'CURVA': 'B' },
+    { 'CÓDIGO': '504', 'DESCRIÇÃO': 'PEPSI COLA PET 2L CAIXA C/6', 'CURVA': 'C' },
+    { 'CÓDIGO': '503', 'DESCRIÇÃO': 'SUKITA PET 2L CAIXA C/6', 'CURVA': 'C' }
+  ];
+
+  const ws = XLSX.utils.json_to_sheet(data);
+  // Column widths
+  ws['!cols'] = [{ wch: 15 }, { wch: 55 }, { wch: 10 }];
+
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Curva_ABC');
+  XLSX.writeFile(wb, 'MODELO_IMPORTACAO_CURVA_ABC_PAU_BRASIL.xlsx');
+}
+

@@ -16,8 +16,9 @@ import { BrandingModal } from './components/BrandingModal';
 import { LoginView } from './components/LoginView';
 import { UserManagementView } from './components/UserManagementView';
 
-import { PullRecord, ProductCatalogItem, Report030519Item, BlitzRecord, PNCRecord, UserAccount } from './types';
+import { PullRecord, ProductCatalogItem, Report030519Item, BlitzRecord, PNCRecord, UserAccount, SupplierItem } from './types';
 import { INITIAL_PRODUCTS } from './data/initialCatalog';
+import { INITIAL_SUPPLIERS } from './data/initialSuppliers';
 import { 
   subscribeToPulls, 
   subscribeToBlitz, 
@@ -25,6 +26,8 @@ import {
   subscribeToReport030519, 
   subscribeToCatalog,
   subscribeToUsers,
+  subscribeToSuppliers,
+  subscribeToBrandSettings,
   savePullToFirestore,
   deletePullFromFirestore,
   saveBlitzToFirestore,
@@ -33,8 +36,12 @@ import {
   deletePNCFromFirestore,
   saveReport030519ToFirestore,
   saveCatalogItemToFirestore,
+  saveCatalogToFirestore,
   saveUserToFirestore,
   deleteUserFromFirestore,
+  saveSupplierToFirestore,
+  deleteSupplierFromFirestore,
+  resetSuppliersToDefault,
   clearCollectionInFirestore,
   clearAllFirestoreData,
   COLLECTIONS,
@@ -42,6 +49,7 @@ import {
   getCachedData,
   DEFAULT_USERS
 } from './services/firebase';
+import { saveStoredBrandSettings } from './utils/branding';
 import { Image as ImageIcon, AlertTriangle, Zap, ShieldAlert, Sparkles, Database, Cloud, Wifi } from 'lucide-react';
 
 export default function App() {
@@ -68,7 +76,26 @@ export default function App() {
 
   // Persistent & Real-Time State - Initialized from LocalStorage cache & synchronized with Firestore
   const [pulls, setPulls] = useState<PullRecord[]>(() => getCachedData(CACHE_KEYS.PULLS, []));
-  const [catalog, setCatalog] = useState<ProductCatalogItem[]>(() => getCachedData(CACHE_KEYS.CATALOG, INITIAL_PRODUCTS));
+  const [catalog, setCatalog] = useState<ProductCatalogItem[]>(() => {
+    const cached = getCachedData<ProductCatalogItem[]>(CACHE_KEYS.CATALOG, INITIAL_PRODUCTS);
+    const map = new Map<string, ProductCatalogItem>();
+    INITIAL_PRODUCTS.forEach(p => map.set(p.code, p));
+    if (cached && Array.isArray(cached)) {
+      cached.forEach(p => {
+        const official = map.get(p.code);
+        if (official) {
+          map.set(p.code, {
+            ...p,
+            ...official,
+          });
+        } else {
+          map.set(p.code, p);
+        }
+      });
+    }
+    return Array.from(map.values());
+  });
+  const [suppliers, setSuppliers] = useState<SupplierItem[]>(() => getCachedData(CACHE_KEYS.SUPPLIERS, INITIAL_SUPPLIERS));
   const [reportItems, setReportItems] = useState<Report030519Item[]>(() => getCachedData(CACHE_KEYS.REPORT_030519, []));
   const [blitzRecords, setBlitzRecords] = useState<BlitzRecord[]>(() => getCachedData(CACHE_KEYS.BLITZ, []));
   const [pncRecords, setPncRecords] = useState<PNCRecord[]>(() => getCachedData(CACHE_KEYS.PNCS, []));
@@ -96,12 +123,42 @@ export default function App() {
 
     const unsubCatalog = subscribeToCatalog((updatedCatalog) => {
       if (updatedCatalog.length > 0) {
-        setCatalog(updatedCatalog);
+        const officialMap = new Map<string, ProductCatalogItem>();
+        INITIAL_PRODUCTS.forEach(p => officialMap.set(p.code, p));
+
+        const mergedCatalog = updatedCatalog.map(p => {
+          const official = officialMap.get(p.code);
+          if (official) {
+            return {
+              ...official,
+              ...p,
+              palletFactor: p.palletFactor || official.palletFactor,
+              lastroFactor: p.lastroFactor || official.lastroFactor,
+              hectoliterFactor: p.hectoliterFactor || official.hectoliterFactor,
+              price: p.price || official.price,
+            };
+          }
+          return p;
+        });
+
+        setCatalog(mergedCatalog);
       }
     });
 
     const unsubUsers = subscribeToUsers((updatedUsers) => {
       setUsers(updatedUsers);
+    });
+
+    const unsubSuppliers = subscribeToSuppliers((updatedSuppliers) => {
+      if (updatedSuppliers.length > 0) {
+        setSuppliers(updatedSuppliers);
+      }
+    });
+
+    const unsubBrand = subscribeToBrandSettings((updatedBrand) => {
+      if (updatedBrand && (updatedBrand.primaryLogoUrl !== undefined || updatedBrand.secondaryLogoUrl !== undefined || updatedBrand.companyName)) {
+        saveStoredBrandSettings(updatedBrand);
+      }
     });
 
     return () => {
@@ -111,6 +168,8 @@ export default function App() {
       unsubReport();
       unsubCatalog();
       unsubUsers();
+      unsubSuppliers();
+      unsubBrand();
     };
   }, []);
 
@@ -160,6 +219,50 @@ export default function App() {
       setUsers(prev => prev.filter(u => u.id !== userId));
     } catch (e) {
       console.error('Error deleting user from Firestore:', e);
+    }
+  };
+
+  const handleSaveSupplier = async (supplierToSave: SupplierItem) => {
+    try {
+      await saveSupplierToFirestore(supplierToSave);
+      setSuppliers(prev => {
+        const idx = prev.findIndex(s => s.id === supplierToSave.id);
+        if (idx >= 0) {
+          const copy = [...prev];
+          copy[idx] = supplierToSave;
+          return copy;
+        }
+        return [supplierToSave, ...prev];
+      });
+    } catch (e) {
+      console.error('Error saving supplier:', e);
+    }
+  };
+
+  const handleDeleteSupplier = async (supplierId: string) => {
+    try {
+      await deleteSupplierFromFirestore(supplierId);
+      setSuppliers(prev => prev.filter(s => s.id !== supplierId));
+    } catch (e) {
+      console.error('Error deleting supplier:', e);
+    }
+  };
+
+  const handleResetSuppliers = async () => {
+    try {
+      await resetSuppliersToDefault();
+      setSuppliers(INITIAL_SUPPLIERS);
+    } catch (e) {
+      console.error('Error resetting suppliers:', e);
+    }
+  };
+
+  const handleUpdateCatalog = async (newCatalog: ProductCatalogItem[]) => {
+    setCatalog(newCatalog);
+    try {
+      await saveCatalogToFirestore(newCatalog);
+    } catch (e) {
+      console.error('Error saving catalog to Firestore:', e);
     }
   };
 
@@ -443,6 +546,7 @@ export default function App() {
           {activeTab === 'new_pull' && (
             <NRICreationForm 
               catalog={catalog}
+              suppliers={suppliers}
               reportItems={reportItems}
               onSavePull={handleSavePull}
               onNavigateToCatalog={() => setActiveTab('catalog')}
@@ -515,19 +619,23 @@ export default function App() {
               reportItems={reportItems}
               onUpdateReportItems={setReportItems}
               catalog={catalog}
-              onUpdateCatalog={setCatalog}
+              onUpdateCatalog={handleUpdateCatalog}
             />
           )}
 
-          {/* BASE DE CADASTROS & LOGOS */}
+          {/* BASE DE CADASTROS, FORNECEDORES & LOGOS */}
           {activeTab === 'catalog' && (
             <ProductCatalogView 
               catalog={catalog}
-              onUpdateCatalog={setCatalog}
+              onUpdateCatalog={handleUpdateCatalog}
+              suppliers={suppliers}
+              onSaveSupplier={handleSaveSupplier}
+              onDeleteSupplier={handleDeleteSupplier}
+              onResetSuppliers={handleResetSuppliers}
               pulls={pulls}
               blitzRecords={blitzRecords}
-              pncRecords={pncRecords}
-              reportItems={reportItems}
+              pncs={pncRecords}
+              report030519={reportItems}
               onOpenBrandingModal={() => setIsBrandingModalOpen(true)}
               onNavigateToUsers={() => setActiveTab('users')}
             />
@@ -561,6 +669,7 @@ export default function App() {
           {activeTab === 'print_labels' && (
             <NRILabelPrintView 
               pull={selectedPull}
+              catalog={catalog}
               onBack={() => setActiveTab('history')}
               onOpenBrandingModal={() => setIsBrandingModalOpen(true)}
             />

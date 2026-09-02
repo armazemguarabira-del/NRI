@@ -273,7 +273,7 @@ export const NRIConferenceSheetPrintView: React.FC<NRIConferenceSheetPrintViewPr
                 <th className="p-2 border-r border-slate-400 text-left">Descrição do Produto</th>
                 <th className="p-2 border-r border-slate-400 w-16">Curva</th>
                 <th className="p-2 border-r border-slate-400 w-20">Pallets</th>
-                <th className="p-2 border-r border-slate-400 w-16">Lastros</th>
+                <th className="p-2 border-r border-slate-400 w-24">Lastros</th>
                 <th className="p-2 border-r border-slate-400 w-24">Qtd Total</th>
                 <th className="p-2 border-r border-slate-400 w-24">Fabricação</th>
                 <th className="p-2 border-r border-slate-400 w-24">Pré-Bloq</th>
@@ -286,8 +286,8 @@ export const NRIConferenceSheetPrintView: React.FC<NRIConferenceSheetPrintViewPr
               {currentPull.items.map((it, idx) => (
                 <tr key={it.id} className="text-center hover:bg-slate-50">
                   <td className="p-2 border-r border-slate-300 font-bold">{idx + 1}</td>
-                  <td className="p-2 border-r border-slate-300 font-mono font-black">{it.productCode}</td>
-                  <td className="p-2 border-r border-slate-300 text-left font-semibold">{it.description}</td>
+                  <td className="p-2 border-r border-slate-300 font-mono font-black text-sm text-slate-950">{it.productCode}</td>
+                  <td className="p-2 border-r border-slate-300 text-left font-bold text-[13px] text-slate-950">{it.description}</td>
                   <td className="p-2 border-r border-slate-300">
                     <span 
                       className="px-2 py-0.5 rounded text-[10px] font-black"

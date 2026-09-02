@@ -34,7 +34,7 @@ export const PauBrasilLogo: React.FC<PauBrasilLogoProps> = ({
     };
   }, []);
 
-  const effectiveLogoUrl = customLogoUrl !== undefined ? customLogoUrl : brand.primaryLogoUrl;
+  const effectiveLogoUrl = customLogoUrl || brand.primaryLogoUrl;
 
   const iconSizes = {
     sm: 'w-6 h-6',
