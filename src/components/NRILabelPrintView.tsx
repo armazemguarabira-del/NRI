@@ -312,22 +312,18 @@ export const NRILabelPrintView: React.FC<NRILabelPrintViewProps> = ({
       {/* Pages Render Container */}
       <div 
         id="printable-sheets-container" 
-        className="flex flex-col items-center justify-center gap-6 print:gap-0 print:m-0 print:p-0 w-full"
+        className="print-content-wrapper flex flex-col items-center justify-center gap-6 print:gap-0 print:m-0 print:p-0 w-full"
       >
         {pagedSheets.map((sheet, sheetIdx) => (
           <div
             key={`sheet-${sheetIdx}`}
             className={
               printSize === 'a4_4_per_page'
-                ? "a4-print-sheet-4 w-[210mm] max-w-full bg-white p-3 print:p-0 border border-slate-300 print:border-none shadow-md print:shadow-none mb-6 print:mb-0 flex flex-col justify-between"
+                ? "a4-print-sheet-4"
                 : printSize === 'a4_double'
-                ? "a4-print-sheet-2 w-[210mm] max-w-full bg-white p-4 print:p-0 border border-slate-300 print:border-none shadow-md print:shadow-none mb-6 print:mb-0 flex flex-col justify-between"
-                : "a4-print-sheet-1 w-[210mm] max-w-full bg-white p-6 print:p-0 border border-slate-300 print:border-none shadow-md print:shadow-none mb-6 print:mb-0 flex flex-col justify-between"
+                ? "a4-print-sheet-2"
+                : "a4-print-sheet-1"
             }
-            style={{
-              fontFamily: "'Plus Jakarta Sans', Arial, sans-serif",
-              boxSizing: 'border-box'
-            }}
           >
             {sheet.map((entry, entryIdx) => (
               <LabelCard
@@ -390,12 +386,12 @@ const LabelCard: React.FC<LabelCardProps> = ({ entry, currentPull, brand, varian
 
   return (
     <div
-      className={`bg-white text-black border-2 border-black font-sans box-border flex flex-col justify-between overflow-hidden ${
+      className={`bg-white text-black font-sans box-border flex flex-col justify-between overflow-hidden ${
         isCompact 
-          ? 'nri-label-card-4 p-1 h-[63.5mm] max-h-[63.5mm] min-h-[63.5mm] print:h-[63.5mm] print:max-h-[63.5mm] print:min-h-[63.5mm] rounded-none' 
+          ? 'nri-label-card-4 p-1 h-[61mm] max-h-[61mm] min-h-[61mm] print:h-[61mm] print:max-h-[61mm] print:min-h-[61mm] rounded-none border border-black' 
           : variant === 'a4_double'
-          ? 'p-4 h-full min-h-[130mm]'
-          : 'p-6 h-full min-h-[265mm]'
+          ? 'p-4 h-full min-h-[130mm] border-2 border-black'
+          : 'p-6 h-full min-h-[265mm] border-2 border-black'
       }`}
     >
       {/* 1. TOP HEADER: AMBEV on the Left + PAU BRASIL GUARABIRA & LOGO on the Right */}
