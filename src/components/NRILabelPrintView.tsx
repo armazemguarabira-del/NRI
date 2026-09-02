@@ -191,7 +191,7 @@ export const NRILabelPrintView: React.FC<NRILabelPrintViewProps> = ({
                 Impressão de Etiquetas de Pallets NRI
               </h2>
               <span className="bg-emerald-100 text-emerald-900 font-mono font-extrabold text-xs px-2.5 py-0.5 rounded-full border border-emerald-300">
-                4 ETIQUETAS POR FOLHA A4
+                4 ETIQUETAS POR FOLHA A4 (1x4)
               </span>
             </div>
             <p className="text-xs text-slate-500 font-medium mt-0.5">
@@ -244,7 +244,7 @@ export const NRILabelPrintView: React.FC<NRILabelPrintViewProps> = ({
               onChange={(e) => setPrintSize(e.target.value as any)}
               className="bg-emerald-50 border border-emerald-300 font-bold text-emerald-950 rounded-xl px-2.5 py-1.5 text-xs focus:ring-2 focus:ring-emerald-500"
             >
-              <option value="a4_4_per_page">⭐ 4 Etiquetas por Folha A4 (Padrão 2x2 - 4 Faces)</option>
+              <option value="a4_4_per_page">⭐ 4 Etiquetas por Folha A4 (Padrão 1x4 Tiras Verticais)</option>
               <option value="a4_double">2 Etiquetas por Folha A4 (1x2)</option>
               <option value="a4_single">1 Etiqueta por Folha A4 (Grande)</option>
               <option value="thermal">Térmica Individual (100x150mm)</option>
@@ -268,10 +268,10 @@ export const NRILabelPrintView: React.FC<NRILabelPrintViewProps> = ({
             key={`sheet-${sheetIdx}`}
             className={
               printSize === 'a4_4_per_page'
-                ? "a4-print-sheet-4 w-[210mm] max-w-full bg-white p-3 print:p-0 border border-slate-300 print:border-none shadow-md print:shadow-none mb-6 print:mb-0 grid grid-cols-2 grid-rows-2 gap-3"
+                ? "a4-print-sheet-4 w-[210mm] max-w-full bg-white p-3 print:p-0 border border-slate-300 print:border-none shadow-md print:shadow-none mb-6 print:mb-0 grid grid-cols-1 grid-rows-4 gap-2.5 h-[285mm]"
                 : printSize === 'a4_double'
-                ? "a4-print-sheet-2 w-[210mm] max-w-full bg-white p-4 print:p-0 border border-slate-300 print:border-none shadow-md print:shadow-none mb-6 print:mb-0 grid grid-cols-1 grid-rows-2 gap-4"
-                : "a4-print-sheet-1 w-[210mm] max-w-full bg-white p-6 print:p-0 border border-slate-300 print:border-none shadow-md print:shadow-none mb-6 print:mb-0 flex flex-col justify-between"
+                ? "a4-print-sheet-2 w-[210mm] max-w-full bg-white p-4 print:p-0 border border-slate-300 print:border-none shadow-md print:shadow-none mb-6 print:mb-0 grid grid-cols-1 grid-rows-2 gap-4 h-[285mm]"
+                : "a4-print-sheet-1 w-[210mm] max-w-full bg-white p-6 print:p-0 border border-slate-300 print:border-none shadow-md print:shadow-none mb-6 print:mb-0 flex flex-col justify-between h-[285mm]"
             }
             style={{
               fontFamily: "'Plus Jakarta Sans', Arial, sans-serif",
@@ -328,147 +328,120 @@ const LabelCard: React.FC<LabelCardProps> = ({ entry, currentPull, brand, varian
     <div
       className={`bg-white text-black border-2 border-black font-sans box-border flex flex-col justify-between overflow-hidden ${
         isCompact 
-          ? 'p-2.5 h-full rounded-none min-h-[132mm] max-h-[138mm]' 
+          ? 'p-2 h-full max-h-[68.5mm] rounded-none' 
           : variant === 'a4_double'
           ? 'p-4 h-full min-h-[135mm]'
           : 'p-6 h-full min-h-[265mm]'
       }`}
     >
-      {/* 1. TOP HEADER: Logo Pau Brasil Guarabira / Ambev + Company Title */}
-      <div className={`flex items-center justify-between border-b-2 border-black ${isCompact ? 'pb-1.5 mb-1.5' : 'pb-2 mb-3'}`}>
+      {/* 1. TOP HEADER: Logo ambev (Blue) + PAU BRASIL GUARABIRA (Bold Blue) */}
+      <div className={`flex items-center justify-between border-b-2 border-black ${isCompact ? 'pb-1' : 'pb-2 mb-2'}`}>
         <div className="flex items-center gap-1.5">
-          <PauBrasilLogo size={isCompact ? "sm" : "md"} variant="horizontal" customLogoUrl={brand.primaryLogoUrl} />
-        </div>
-        <div className="text-right">
-          <h1 className={`font-black uppercase tracking-tight text-[#002B7F] font-mono leading-none ${isCompact ? 'text-xs sm:text-sm' : 'text-xl sm:text-2xl'}`}>
-            {brand.companyName}
-          </h1>
-          <span className={`font-extrabold text-slate-800 tracking-wider uppercase block ${isCompact ? 'text-[7.5px] sm:text-[8px] mt-0.5' : 'text-[10px] sm:text-xs'}`}>
-            {brand.subtitle}
-          </span>
-        </div>
-      </div>
-
-      {/* 2. PRODUCT CODE & DESCRIPTION + CURVA ABC */}
-      <div className={`flex items-stretch justify-between gap-2 ${isCompact ? 'mb-1.5' : 'mb-3'}`}>
-        <div className="flex-1 flex flex-col justify-center">
-          <h2 className={`font-black uppercase text-black tracking-tight leading-snug line-clamp-2 ${isCompact ? 'text-xs sm:text-sm' : 'text-xl sm:text-2xl'}`}>
-            <span className="font-mono">{item.productCode}</span> – {item.description}
-          </h2>
-          {isFractionalLastro && (
-            <span className="inline-block mt-0.5 text-[8.5px] font-black bg-amber-200 text-amber-950 px-1.5 py-0.2 border border-amber-400 w-fit uppercase">
-              PALLET FRACIONADO / LASTRO ({item.lastroCount} Lastros)
+          {brand.primaryLogoUrl ? (
+            <img 
+              src={brand.primaryLogoUrl} 
+              alt="Logo" 
+              className={isCompact ? "max-h-5 max-w-[80px] object-contain" : "max-h-8 max-w-[120px] object-contain"} 
+              referrerPolicy="no-referrer"
+            />
+          ) : (
+            <span className={`font-black tracking-tighter lowercase font-sans text-[#002B7F] ${isCompact ? 'text-xl' : 'text-3xl'}`}>
+              ambev
             </span>
           )}
         </div>
-
-        {/* CURVA ABC BADGE */}
-        <div className={`border-2 border-black flex flex-col items-center justify-center shrink-0 text-center overflow-hidden ${isCompact ? 'min-w-[48px]' : 'min-w-[85px]'}`}>
-          <div className={`bg-white text-black font-black tracking-widest border-b-2 border-black w-full text-center ${isCompact ? 'text-[7.5px] py-0.2' : 'text-xs py-0.5'}`}>
-            CURVA
-          </div>
-          <div 
-            className={`w-full font-black flex items-center justify-center font-mono ${isCompact ? 'text-lg sm:text-xl py-0.5' : 'text-3xl sm:text-4xl py-1.5'}`}
-            style={{
-              backgroundColor: item.abcClass === 'A' ? '#16a34a' : item.abcClass === 'B' ? '#eab308' : '#ef4444',
-              color: item.abcClass === 'B' ? '#000000' : '#ffffff'
-            }}
-          >
-            {item.abcClass}
-          </div>
+        <div className="text-right">
+          <span className={`font-black uppercase tracking-tight text-[#002B7F] font-sans leading-none ${isCompact ? 'text-base sm:text-lg' : 'text-2xl sm:text-3xl'}`}>
+            {brand.companyName || 'PAU BRASIL GUARABIRA'}
+          </span>
         </div>
       </div>
 
-      {/* 3. HERO DATE BANNER: CARREG ATÉ */}
-      <div className={`flex items-center gap-2 ${isCompact ? 'my-1' : 'my-3 sm:my-4'}`}>
-        <div className={`text-right flex flex-col justify-center ${isCompact ? 'min-w-[55px]' : 'min-w-[75px]'}`}>
-          <span className={`font-black uppercase leading-tight tracking-tight ${isCompact ? 'text-[10px] sm:text-xs' : 'text-base sm:text-lg'}`}>CARREG</span>
-          <span className={`font-black uppercase leading-tight tracking-tight ${isCompact ? 'text-[10px] sm:text-xs' : 'text-base sm:text-lg'}`}>ATÉ:</span>
+      {/* 2. PRODUCT CODE & DESCRIPTION CENTERED */}
+      <div className={`text-center font-black uppercase text-black tracking-tight leading-tight truncate ${isCompact ? 'text-xs sm:text-sm my-0.5' : 'text-lg sm:text-xl my-2'}`}>
+        <span className="font-mono">{item.productCode}</span> - {item.description}
+      </div>
+
+      {/* 3. HERO SECTION: "Carreg até:" + BLACK BOX WITH LOAD DATE + CURVA BOX */}
+      <div className={`flex items-center justify-between gap-2.5 ${isCompact ? 'my-0.5' : 'my-2'}`}>
+        {/* Left: Carreg até: */}
+        <div className={`text-right flex flex-col justify-center leading-tight shrink-0 ${isCompact ? 'min-w-[50px]' : 'min-w-[70px]'}`}>
+          <span className={`font-black uppercase text-black ${isCompact ? 'text-xs' : 'text-base'}`}>Carreg</span>
+          <span className={`font-black uppercase text-black ${isCompact ? 'text-xs' : 'text-base'}`}>até:</span>
         </div>
 
-        <div className={`flex-1 bg-black text-white text-center rounded-xs ${isCompact ? 'px-2 py-1' : 'px-4 py-2.5'}`}>
-          <span className={`font-black font-mono tracking-wider ${isCompact ? 'text-xl sm:text-2xl md:text-3xl' : 'text-4xl sm:text-5xl md:text-6xl'}`}>
+        {/* Center: Giant Black Box with Load Until Date */}
+        <div className={`flex-1 bg-black text-white text-center flex items-center justify-center ${isCompact ? 'py-1 px-2' : 'py-3 px-4'}`}>
+          <span className={`font-black font-mono tracking-wider text-white ${isCompact ? 'text-2xl sm:text-3xl' : 'text-5xl sm:text-6xl'}`}>
             {formatDateBR(item.loadUntilDate || item.validityDate)}
           </span>
         </div>
-      </div>
 
-      {/* 4. SECONDARY DATES: PRÉ-BLOQUEIO & VALIDADE */}
-      <div className={`flex items-center justify-between border-y-2 border-black px-1 ${isCompact ? 'py-1 my-1' : 'py-2.5 my-3'}`}>
-        <div className="flex items-baseline gap-1.5">
-          <span className={`font-black ${isCompact ? 'text-[10px] sm:text-xs' : 'text-base sm:text-lg'}`}>Pré-bloq:</span>
-          <span className={`font-black font-mono text-black ${isCompact ? 'text-xs sm:text-sm' : 'text-xl sm:text-2xl'}`}>
-            {formatDateBR(item.preBlockDate)}
-          </span>
-        </div>
-
-        <div className="flex items-baseline gap-1.5">
-          <span className={`font-black ${isCompact ? 'text-[10px] sm:text-xs' : 'text-base sm:text-lg'}`}>Validade:</span>
-          <span className={`font-black font-mono text-black ${isCompact ? 'text-xs sm:text-sm' : 'text-xl sm:text-2xl'}`}>
-            {formatDateBR(item.validityDate)}
-          </span>
+        {/* Right: Curva Box (Top CURVA, Bottom Large Letter in Black Box) */}
+        <div className={`border-2 border-black flex flex-col items-center justify-center shrink-0 text-center overflow-hidden ${isCompact ? 'min-w-[52px]' : 'min-w-[80px]'}`}>
+          <div className={`bg-white text-black font-black tracking-wider border-b-2 border-black w-full text-center ${isCompact ? 'text-[8.5px] py-0.2' : 'text-xs py-0.5'}`}>
+            CURVA
+          </div>
+          <div className={`w-full bg-black text-white font-black flex items-center justify-center font-mono ${isCompact ? 'text-xl sm:text-2xl py-0.2' : 'text-4xl py-1.5'}`}>
+            {item.abcClass || 'A'}
+          </div>
         </div>
       </div>
 
-      {/* 5. RECEIPT DATE & FACE BADGE */}
-      <div className={`text-left font-bold text-slate-900 flex items-center justify-between ${isCompact ? 'text-[9.5px] sm:text-[10px] my-1' : 'text-xs sm:text-sm mb-1'}`}>
+      {/* 4. SUB-DATES: Pré-bloq & Validade */}
+      <div className={`flex items-center justify-between px-1 font-sans ${isCompact ? 'text-[10px] sm:text-[11px] my-0.5' : 'text-base sm:text-lg my-1.5'}`}>
         <div>
-          Receb.: <span className={`font-mono font-black ${isCompact ? 'text-[10px] sm:text-xs' : 'text-sm sm:text-base'}`}>{formatDateBR(currentPull.header.receiptDate)}</span>
+          <span className="font-black text-black">Pré-bloq:</span>{' '}
+          <span className="font-mono font-black text-black">{formatDateBR(item.preBlockDate)}</span>
         </div>
-        <div className={`font-mono font-black bg-slate-100 border border-slate-400 ${isCompact ? 'text-[8.5px] sm:text-[9.5px] px-1.5 py-0.2' : 'text-xs sm:text-sm px-3 py-0.5'}`}>
-          {faceLabel}
-        </div>
-      </div>
-
-      {/* 6. COMPACT 7-COLUMN FOOTER TABLE */}
-      <div className={`border border-black grid grid-cols-7 text-center divide-x divide-black bg-slate-50 font-sans ${isCompact ? 'text-[8px] sm:text-[8.5px]' : 'text-[11px] sm:text-xs'}`}>
-        <div className={isCompact ? "p-0.5" : "p-1.5"}>
-          <div className={`font-black uppercase text-slate-700 tracking-wider ${isCompact ? 'text-[7px]' : 'text-[9px]'}`}>CONFERENTE</div>
-          <div className="font-bold text-black truncate">{currentPull.header.receiverName || 'Gilson'}</div>
-        </div>
-
-        <div className={isCompact ? "p-0.5" : "p-1.5"}>
-          <div className={`font-black uppercase text-slate-700 tracking-wider ${isCompact ? 'text-[7px]' : 'text-[9px]'}`}>TURNO</div>
-          <div className="font-bold text-black">{currentPull.header.shift || 'Manhã'}</div>
-        </div>
-
-        <div className={isCompact ? "p-0.5" : "p-1.5"}>
-          <div className={`font-black uppercase text-slate-700 tracking-wider ${isCompact ? 'text-[7px]' : 'text-[9px]'}`}>HORA</div>
-          <div className="font-bold text-black font-mono">{currentPull.header.receiptTime || '11:41'}</div>
-        </div>
-
-        <div className={`${isCompact ? "p-0.5" : "p-1.5"} bg-amber-100`}>
-          <div className={`font-black uppercase text-slate-700 tracking-wider ${isCompact ? 'text-[7px]' : 'text-[9px]'}`}>QTDE TT</div>
-          <div className={`font-black text-black font-mono ${isCompact ? 'text-[8.5px] sm:text-[9px]' : 'text-xs sm:text-sm'}`}>{quantityInPallet} sku</div>
-        </div>
-
-        <div className={isCompact ? "p-0.5" : "p-1.5"}>
-          <div className={`font-black uppercase text-slate-700 tracking-wider ${isCompact ? 'text-[7px]' : 'text-[9px]'}`}>NOTA</div>
-          <div className="font-bold text-black font-mono truncate">{currentPull.header.nfeNumber}</div>
-        </div>
-
-        <div className={isCompact ? "p-0.5" : "p-1.5"}>
-          <div className={`font-black uppercase text-slate-700 tracking-wider ${isCompact ? 'text-[7px]' : 'text-[9px]'}`}>ORIGEM</div>
-          <div className="font-bold text-black truncate">{currentPull.header.factoryOrigin || 'F. Itapissuma'}</div>
-        </div>
-
-        <div className={isCompact ? "p-0.5" : "p-1.5"}>
-          <div className={`font-black uppercase text-slate-700 tracking-wider ${isCompact ? 'text-[7px]' : 'text-[9px]'}`}>CARRETA</div>
-          <div className="font-black text-black font-mono uppercase truncate">{currentPull.header.truckPlate || 'RLU3F59'}</div>
+        <div>
+          <span className="font-black text-black">Validade:</span>{' '}
+          <span className="font-mono font-black text-black">{formatDateBR(item.validityDate)}</span>
         </div>
       </div>
 
-      {/* 7. PALLET IDENTIFIER FOOTER */}
-      <div className={`flex justify-between items-center text-slate-800 font-mono border-t-2 border-slate-300 ${isCompact ? 'text-[8px] sm:text-[8.5px] mt-1.5 pt-1' : 'text-[11px] sm:text-xs mt-2.5 pt-1.5'}`}>
-        <span className="font-black text-slate-950 truncate">
-          PALLET {palletNumber} DE {totalPalletsOfItem} (CARGA: #{globalPalletIndex}/{totalGlobalPallets})
-        </span>
-        <span className="font-black text-amber-800 shrink-0">
-          {faceLabel}
-        </span>
-        <span className="font-bold text-slate-700 truncate">
-          {item.status} ({item.daysToExpiry}D)
-        </span>
+      {/* 5. RECEIPT DATE & 7-COLUMN METADATA GRID */}
+      <div>
+        <div className={`text-left font-bold text-black px-0.5 mb-0.5 ${isCompact ? 'text-[8.5px] sm:text-[9.5px]' : 'text-xs sm:text-sm'}`}>
+          Receb.: <span className="font-mono font-bold">{formatDateBR(currentPull.header.receiptDate)}</span>
+        </div>
+
+        <div className={`border border-black grid grid-cols-7 text-center divide-x divide-black bg-white font-sans ${isCompact ? 'text-[7.5px] sm:text-[8px]' : 'text-[11px] sm:text-xs'}`}>
+          <div className="p-0.5">
+            <div className="font-bold uppercase text-[6.5px] sm:text-[7px] text-slate-700">CONFERENTE</div>
+            <div className="font-bold text-black truncate">{currentPull.header.receiverName || 'Gilson'}</div>
+          </div>
+
+          <div className="p-0.5">
+            <div className="font-bold uppercase text-[6.5px] sm:text-[7px] text-slate-700">TURNO</div>
+            <div className="font-bold text-black">{currentPull.header.shift || 'Tarde'}</div>
+          </div>
+
+          <div className="p-0.5">
+            <div className="font-bold uppercase text-[6.5px] sm:text-[7px] text-slate-700">HORA</div>
+            <div className="font-bold text-black font-mono">{currentPull.header.receiptTime || '15:30'}</div>
+          </div>
+
+          <div className="p-0.5 bg-slate-50">
+            <div className="font-bold uppercase text-[6.5px] sm:text-[7px] text-slate-700">QTDE TT</div>
+            <div className="font-bold text-black font-mono">{quantityInPallet || item.quantitySku}</div>
+          </div>
+
+          <div className="p-0.5">
+            <div className="font-bold uppercase text-[6.5px] sm:text-[7px] text-slate-700">NOTA</div>
+            <div className="font-bold text-black font-mono truncate">{currentPull.header.nfeNumber}</div>
+          </div>
+
+          <div className="p-0.5">
+            <div className="font-bold uppercase text-[6.5px] sm:text-[7px] text-slate-700">ORIGEM</div>
+            <div className="font-bold text-black truncate">{currentPull.header.factoryOrigin || 'DR João Pessoa'}</div>
+          </div>
+
+          <div className="p-0.5">
+            <div className="font-bold uppercase text-[6.5px] sm:text-[7px] text-slate-700">CARRETA</div>
+            <div className="font-bold text-black font-mono uppercase truncate">{currentPull.header.truckPlate || 'RLT5J44'}</div>
+          </div>
+        </div>
       </div>
     </div>
   );

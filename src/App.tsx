@@ -38,6 +38,8 @@ import {
   clearCollectionInFirestore,
   clearAllFirestoreData,
   COLLECTIONS,
+  CACHE_KEYS,
+  getCachedData,
   DEFAULT_USERS
 } from './services/firebase';
 import { Image as ImageIcon, AlertTriangle, Zap, ShieldAlert, Sparkles, Database, Cloud, Wifi } from 'lucide-react';
@@ -53,7 +55,7 @@ export default function App() {
     }
   });
 
-  const [users, setUsers] = useState<UserAccount[]>(DEFAULT_USERS);
+  const [users, setUsers] = useState<UserAccount[]>(() => getCachedData(CACHE_KEYS.USERS, DEFAULT_USERS));
 
   // Navigation State (Dashboard is the first tab)
   const [activeTab, setActiveTab] = useState<NavTabType>('analytics');
@@ -64,12 +66,12 @@ export default function App() {
   // Branding Modal State
   const [isBrandingModalOpen, setIsBrandingModalOpen] = useState(false);
 
-  // Firestore Real-Time State - Starts zeroed/clean (only showing what was manually inserted)
-  const [pulls, setPulls] = useState<PullRecord[]>([]);
-  const [catalog, setCatalog] = useState<ProductCatalogItem[]>(INITIAL_PRODUCTS);
-  const [reportItems, setReportItems] = useState<Report030519Item[]>([]);
-  const [blitzRecords, setBlitzRecords] = useState<BlitzRecord[]>([]);
-  const [pncRecords, setPncRecords] = useState<PNCRecord[]>([]);
+  // Persistent & Real-Time State - Initialized from LocalStorage cache & synchronized with Firestore
+  const [pulls, setPulls] = useState<PullRecord[]>(() => getCachedData(CACHE_KEYS.PULLS, []));
+  const [catalog, setCatalog] = useState<ProductCatalogItem[]>(() => getCachedData(CACHE_KEYS.CATALOG, INITIAL_PRODUCTS));
+  const [reportItems, setReportItems] = useState<Report030519Item[]>(() => getCachedData(CACHE_KEYS.REPORT_030519, []));
+  const [blitzRecords, setBlitzRecords] = useState<BlitzRecord[]>(() => getCachedData(CACHE_KEYS.BLITZ, []));
+  const [pncRecords, setPncRecords] = useState<PNCRecord[]>(() => getCachedData(CACHE_KEYS.PNCS, []));
   const [isDbConnected, setIsDbConnected] = useState<boolean>(true);
 
   // Real-time Firestore Subscriptions

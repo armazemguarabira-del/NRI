@@ -60,7 +60,7 @@
     display: block !important;
   }
 
-  /* 4 Labels per A4 sheet printing container */
+  /* 4 Horizontal Labels Stacked Vertically per A4 sheet (1 column x 4 rows) */
   .a4-print-sheet-4 {
     width: 100% !important;
     height: 285mm !important;
@@ -68,9 +68,9 @@
     page-break-after: always !important;
     break-after: page !important;
     display: grid !important;
-    grid-template-columns: 1fr 1fr !important;
-    grid-template-rows: 1fr 1fr !important;
-    gap: 3.5mm !important;
+    grid-template-columns: 1fr !important;
+    grid-template-rows: repeat(4, 1fr) !important;
+    gap: 3mm !important;
     padding: 0 !important;
     margin: 0 auto !important;
     box-sizing: border-box !important;

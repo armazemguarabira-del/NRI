@@ -783,6 +783,18 @@ export const NRICreationForm: React.FC<NRICreationFormProps> = ({
                         Fator Lastro: <span className="font-bold text-slate-700">{catItem?.lastroFactor || 10}</span> | 
                         Hecto: <span className="font-bold text-slate-700">{it.hectoliterFactor}</span>
                       </div>
+                      {it.isUnder60Days && (
+                        <div className="mt-1 inline-flex items-center gap-1 px-2 py-0.5 bg-red-100 text-red-900 border border-red-300 rounded text-[10px] font-black">
+                          <AlertTriangle className="w-3 h-3 text-red-600 animate-pulse" />
+                          <span>ALERTA: Validade &le; 60 dias ({it.daysToExpiry} dias restantes)</span>
+                        </div>
+                      )}
+                      {it.hasRunoffRisk && !it.isUnder60Days && (
+                        <div className="mt-1 inline-flex items-center gap-1 px-2 py-0.5 bg-amber-100 text-amber-900 border border-amber-300 rounded text-[10px] font-bold">
+                          <AlertTriangle className="w-3 h-3 text-amber-700" />
+                          <span>ALERTA ESCOAMENTO: Venda média ({it.dailySalesAvg} un/d) requer ~{it.neededRunoffDays} dias para escoar</span>
+                        </div>
+                      )}
                     </td>
 
                     {/* Curva ABC (Strict Green=A, Yellow=B, Red=C) */}

@@ -57,12 +57,13 @@ export interface NRIItem {
   palletCount: number;   // Calculated or entered
   lastroCount: number;   // Calculated or entered
   validityDate: string;  // YYYY-MM-DD
+  manufacturingDate?: string;
   status: 'OK' | 'ALERTA' | 'CRÍTICO' | 'BLOQUEADO';
   releasePeriodDays: number; // e.g. 40 days
   daysToExpiry: number;      // Days from receipt to expiry
   isPeriodOk: boolean;
   baseRisk: ItemRiskLevel;
-  runoffDays: number;        // Dias para escoamento (do relatório 03.05.19)
+  runoffDays: number;        // Dias para escoamento padrão
   abcClass: ABCClass;
   hectoliterFactor: number;
   totalHectoliter: number;
@@ -71,6 +72,12 @@ export interface NRIItem {
   preBlockDate: string;      // DD/MM/YYYY or YYYY-MM-DD
   loadUntilDate: string;     // DD/MM/YYYY or YYYY-MM-DD
   palletNumber?: number;     // 1 to N
+  // Regras de Alerta por Venda Média & 60 dias
+  dailySalesAvg?: number;            // Venda média diária (cx/dia)
+  neededRunoffDays?: number;         // Dias necessários para escoar o lote (quantitySku / dailySalesAvg)
+  hasRunoffRisk?: boolean;           // true se neededRunoffDays > prazo útil de validade
+  isUnder60Days?: boolean;           // true se dias restantes <= 60 dias
+  validityAlertObservation?: string; // Observação explicativa do alerta de validade / escoamento
 }
 
 export interface NRIPullHeader {

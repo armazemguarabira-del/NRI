@@ -70,26 +70,72 @@ export function recalculateItem(
   const validity = item.validityDate || addDaysToDate(receiptDate || new Date().toISOString(), catalogItem?.defaultShelfLifeDays || 180);
   const daysToExpiry = calculateDateDiffDays(validity, receiptDate || new Date().toISOString().split('T')[0]);
 
+  // Venda média diária (cx/unidades por dia)
+  let dailySalesAvg = 0;
+  if (catalogItem?.monthlyMovement && catalogItem.monthlyMovement > 0) {
+    dailySalesAvg = Number((catalogItem.monthlyMovement / 30).toFixed(1));
+  } else {
+    // Estimativa baseada na Curva ABC
+    if (abc === 'A') dailySalesAvg = 40.0;
+    else if (abc === 'B') dailySalesAvg = 10.0;
+    else dailySalesAvg = 2.0;
+  }
+
+  // Dias necessários para escoar este volume específico recebido
+  const neededRunoffDays = dailySalesAvg > 0 ? Number((qtySku / dailySalesAvg).toFixed(1)) : 0;
+
+  // Dias úteis até o pré-bloqueio (40 dias antes) e até o vencimento
+  const usefulDaysUntilPreBlock = Math.max(0, daysToExpiry - releaseDays);
+  const usefulDaysUntilLoad = Math.max(0, daysToExpiry - 30);
+
+  // Risco 1: Validade com 60 dias ou menos
+  const isUnder60Days = daysToExpiry <= 60 && daysToExpiry >= 0;
+
+  // Risco 2: Perigo de não escoar a tempo de acordo com a venda média
+  // Ocorre se o tempo necessário para escoar o lote ultrapassar o prazo útil até o pré-bloqueio ou o vencimento total
+  const hasRunoffRisk = dailySalesAvg > 0 && (neededRunoffDays > usefulDaysUntilPreBlock || neededRunoffDays > daysToExpiry);
+
   const isPeriodOk = daysToExpiry >= releaseDays;
   let status: 'OK' | 'ALERTA' | 'CRÍTICO' | 'BLOQUEADO' = 'OK';
   let baseRisk: ItemRiskLevel = 'Baixo';
+  let validityAlertObservation = '';
 
-  // Alerta de validade inferior a 3 meses (90 dias)
   if (daysToExpiry < 0) {
     status = 'BLOQUEADO';
     baseRisk = 'Alto';
+    validityAlertObservation = `PRODUTO VENCIDO: Data de validade (${formatDateBR(validity)}) anterior ao recebimento! Bloqueio imediato.`;
   } else if (daysToExpiry < releaseDays) {
     status = 'CRÍTICO';
     baseRisk = 'Alto';
+    validityAlertObservation = `ALERTA CRÍTICO: Restam ${daysToExpiry} dias de validade (inferior ao prazo mínimo de liberação de ${releaseDays} dias).`;
+  } else if (isUnder60Days && hasRunoffRisk) {
+    status = 'CRÍTICO';
+    baseRisk = 'Alto';
+    validityAlertObservation = `ALERTA CRÍTICO: Validade curta (${daysToExpiry} dias <= 60d) E perigo de não escoar a tempo (venda média de ${dailySalesAvg} ${item.unit || 'cx'}/dia requer ~${neededRunoffDays} dias vs ${usefulDaysUntilPreBlock} dias úteis até o pré-bloqueio).`;
+  } else if (isUnder60Days) {
+    status = 'CRÍTICO';
+    baseRisk = 'Alto';
+    validityAlertObservation = `ALERTA DE VALIDADE (<= 60 DIAS): Restam apenas ${daysToExpiry} dias para o vencimento. Prioridade máxima de carregamento/giro.`;
+  } else if (hasRunoffRisk) {
+    status = 'ALERTA';
+    baseRisk = 'Alto';
+    if (neededRunoffDays > daysToExpiry) {
+      validityAlertObservation = `ALERTA GRAVE DE ESCOAMENTO: Venda média de ${dailySalesAvg} ${item.unit || 'cx'}/dia necessita de ~${neededRunoffDays} dias para escoar este volume (${qtySku} un), ultrapassando a validade total (${daysToExpiry} dias).`;
+    } else {
+      validityAlertObservation = `ALERTA DE ESCOAMENTO: Venda média de ${dailySalesAvg} ${item.unit || 'cx'}/dia necessita de ~${neededRunoffDays} dias para escoar este volume (${qtySku} un), excedendo o prazo útil antes do pré-bloqueio (${usefulDaysUntilPreBlock} dias úteis).`;
+    }
   } else if (daysToExpiry <= 90) { // < 3 meses
     status = 'ALERTA';
     baseRisk = 'Alto';
+    validityAlertObservation = `ALERTA: Validade reduzida (${daysToExpiry} dias restantes, inferior a 90 dias).`;
   } else if (daysToExpiry <= 120) {
     status = 'ALERTA';
     baseRisk = 'Médio';
+    validityAlertObservation = `ATENÇÃO: Validade de ${daysToExpiry} dias (giro estimado em ~${neededRunoffDays} dias pela venda média).`;
   } else {
     status = 'OK';
     baseRisk = 'Baixo';
+    validityAlertObservation = `Validade regular (${daysToExpiry} dias). Escoamento previsto em ~${neededRunoffDays} dias (venda média: ${dailySalesAvg} ${item.unit || 'cx'}/dia).`;
   }
 
   // Pre-bloqueio: 40 dias antes do vencimento
@@ -110,12 +156,13 @@ export function recalculateItem(
     palletCount: pallets,
     lastroCount: lastros,
     validityDate: validity,
+    manufacturingDate: item.manufacturingDate,
     status,
     releasePeriodDays: releaseDays,
     daysToExpiry,
     isPeriodOk,
     baseRisk,
-    runoffDays: item.runoffDays ?? 2.0,
+    runoffDays: item.runoffDays ?? (neededRunoffDays || 2.0),
     abcClass: abc,
     hectoliterFactor: hFactor,
     totalHectoliter,
@@ -123,7 +170,12 @@ export function recalculateItem(
     totalValue,
     preBlockDate: item.preBlockDate || preBlockDate,
     loadUntilDate: item.loadUntilDate || loadUntilDate,
-    palletNumber: item.palletNumber || 1
+    palletNumber: item.palletNumber || 1,
+    dailySalesAvg,
+    neededRunoffDays,
+    hasRunoffRisk,
+    isUnder60Days,
+    validityAlertObservation
   };
 }
 
@@ -594,6 +646,11 @@ export function exportAllBasesToCSV(params: {
         'Dias até Vencimento': item.daysToExpiry,
         'Status Validade': item.status,
         'Curva ABC': item.abcClass,
+        'Venda Média Diária': item.dailySalesAvg ? `${item.dailySalesAvg} ${item.unit || 'cx'}/dia` : '-',
+        'Dias para Escoar': item.neededRunoffDays ? `${item.neededRunoffDays} dias` : '-',
+        'Alerta <= 60 Dias': item.isUnder60Days ? 'SIM (CRÍTICO)' : 'NÃO',
+        'Risco Não Escoar': item.hasRunoffRisk ? 'SIM (ALERTA)' : 'NÃO',
+        'Observação de Validade': item.validityAlertObservation || '-',
         'Volume Total (HL)': item.totalHectoliter,
         'Valor Total (R$)': item.totalValue
       });
@@ -750,6 +807,11 @@ export function exportAllSystemBasesToExcel(params: {
         'Dias até Vencimento': item.daysToExpiry,
         'Status Validade': item.status,
         'Curva ABC': item.abcClass,
+        'Venda Média Diária': item.dailySalesAvg ? `${item.dailySalesAvg} ${item.unit || 'cx'}/dia` : '-',
+        'Dias para Escoamento': item.neededRunoffDays ? `${item.neededRunoffDays} dias` : '-',
+        'Alerta <= 60 Dias': item.isUnder60Days ? 'SIM' : 'NÃO',
+        'Risco Não Escoar a Tempo': item.hasRunoffRisk ? 'SIM' : 'NÃO',
+        'Observação / Diagnóstico Validade': item.validityAlertObservation || '-',
         'Volume Total (HL)': item.totalHectoliter,
         'Valor Total (R$)': item.totalValue
       });
