@@ -1,9 +1,6 @@
 import { initializeApp, getApps, getApp } from 'firebase/app';
 import { 
   getFirestore,
-  initializeFirestore, 
-  persistentLocalCache,
-  persistentMultipleTabManager,
   collection, 
   doc, 
   setDoc, 
@@ -20,25 +17,8 @@ import { INITIAL_SUPPLIERS } from '../data/initialSuppliers';
 // Initialize Firebase App instance safely (singleton pattern)
 const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
 
-function getOrCreateFirestore() {
-  const dbId = firebaseConfig.firestoreDatabaseId || undefined;
-  try {
-    return initializeFirestore(app, {
-      experimentalAutoDetectLongPolling: true,
-      localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() })
-    }, dbId);
-  } catch (err) {
-    try {
-      return initializeFirestore(app, {
-        experimentalAutoDetectLongPolling: true,
-      }, dbId);
-    } catch {
-      return getFirestore(app, dbId);
-    }
-  }
-}
-
-export const db = getOrCreateFirestore();
+// Direct binding to the dedicated Firestore Database ID from configuration
+export const db = getFirestore(app, firebaseConfig.firestoreDatabaseId || undefined);
 
 // Collection Names in Firestore
 export const COLLECTIONS = {
@@ -84,16 +64,21 @@ export function setCachedData<T>(key: string, data: T): void {
   }
 }
 
-// Real-time synchronization hooks/subscribers with Cache fallback
+// Track initial syncs to avoid erasing local data on fresh database
+let hasSyncedLocalPulls = false;
+let hasSyncedLocalBlitz = false;
+let hasSyncedLocalPNCs = false;
+
+// Real-time synchronization hooks/subscribers with Cache fallback & Auto-sync
 export function subscribeToPulls(onUpdate: (pulls: PullRecord[]) => void) {
-  // Emit immediately from cache to ensure zero flash / zero data loss
+  // 1. Emit immediately from cache to ensure zero flash / zero data loss
   const cached = getCachedData<PullRecord[]>(CACHE_KEYS.PULLS, []);
   if (cached && cached.length > 0) {
     onUpdate(cached);
   }
 
   const pullsRef = collection(db, COLLECTIONS.PULLS);
-  return onSnapshot(pullsRef, (snapshot) => {
+  return onSnapshot(pullsRef, async (snapshot) => {
     const list: PullRecord[] = [];
     snapshot.forEach((docSnap) => {
       list.push(docSnap.data() as PullRecord);
@@ -101,11 +86,33 @@ export function subscribeToPulls(onUpdate: (pulls: PullRecord[]) => void) {
     // Sort descending by createdAt or receiptDate
     list.sort((a, b) => (b.header.createdAt || b.header.receiptDate || '').localeCompare(a.header.createdAt || a.header.receiptDate || ''));
     
-    // Save to cache
-    if (list.length > 0 || snapshot.empty) {
-      setCachedData(CACHE_KEYS.PULLS, list);
+    // Auto-migration: If Firestore is empty on first load but local storage has cached pulls, upload them to Firestore!
+    if (snapshot.empty && cached && cached.length > 0 && !hasSyncedLocalPulls) {
+      hasSyncedLocalPulls = true;
+      try {
+        const batch = writeBatch(db);
+        for (const p of cached) {
+          batch.set(doc(db, COLLECTIONS.PULLS, p.header.id), p, { merge: true });
+        }
+        await batch.commit();
+        console.log(`Auto-synced ${cached.length} local pulls to Firestore database.`);
+      } catch (err) {
+        console.warn('Could not auto-sync local pulls to Firestore:', err);
+      }
+      onUpdate(cached);
+      return;
     }
-    onUpdate(list);
+
+    hasSyncedLocalPulls = true;
+
+    // If Firestore returned records, update local cache and state
+    if (list.length > 0) {
+      setCachedData(CACHE_KEYS.PULLS, list);
+      onUpdate(list);
+    } else if (snapshot.empty && (!cached || cached.length === 0)) {
+      setCachedData(CACHE_KEYS.PULLS, []);
+      onUpdate([]);
+    }
   }, (error) => {
     console.error('Error listening to pulls in Firestore, using cache fallback:', error);
     const fallback = getCachedData<PullRecord[]>(CACHE_KEYS.PULLS, []);
@@ -120,14 +127,37 @@ export function subscribeToBlitz(onUpdate: (blitz: BlitzRecord[]) => void) {
   }
 
   const blitzRef = collection(db, COLLECTIONS.BLITZ);
-  return onSnapshot(blitzRef, (snapshot) => {
+  return onSnapshot(blitzRef, async (snapshot) => {
     const list: BlitzRecord[] = [];
     snapshot.forEach((docSnap) => {
       list.push(docSnap.data() as BlitzRecord);
     });
     list.sort((a, b) => (b.blockDate || '').localeCompare(a.blockDate || ''));
-    setCachedData(CACHE_KEYS.BLITZ, list);
-    onUpdate(list);
+
+    if (snapshot.empty && cached && cached.length > 0 && !hasSyncedLocalBlitz) {
+      hasSyncedLocalBlitz = true;
+      try {
+        const batch = writeBatch(db);
+        for (const b of cached) {
+          batch.set(doc(db, COLLECTIONS.BLITZ, b.id), b, { merge: true });
+        }
+        await batch.commit();
+      } catch (err) {
+        console.warn('Could not auto-sync blitz records to Firestore:', err);
+      }
+      onUpdate(cached);
+      return;
+    }
+
+    hasSyncedLocalBlitz = true;
+
+    if (list.length > 0) {
+      setCachedData(CACHE_KEYS.BLITZ, list);
+      onUpdate(list);
+    } else if (snapshot.empty && (!cached || cached.length === 0)) {
+      setCachedData(CACHE_KEYS.BLITZ, []);
+      onUpdate([]);
+    }
   }, (error) => {
     console.error('Error listening to blitz in Firestore, using cache fallback:', error);
     onUpdate(getCachedData<BlitzRecord[]>(CACHE_KEYS.BLITZ, []));
@@ -141,14 +171,37 @@ export function subscribeToPNCs(onUpdate: (pncs: PNCRecord[]) => void) {
   }
 
   const pncRef = collection(db, COLLECTIONS.PNCS);
-  return onSnapshot(pncRef, (snapshot) => {
+  return onSnapshot(pncRef, async (snapshot) => {
     const list: PNCRecord[] = [];
     snapshot.forEach((docSnap) => {
       list.push(docSnap.data() as PNCRecord);
     });
     list.sort((a, b) => (b.requestDate || '').localeCompare(a.requestDate || ''));
-    setCachedData(CACHE_KEYS.PNCS, list);
-    onUpdate(list);
+
+    if (snapshot.empty && cached && cached.length > 0 && !hasSyncedLocalPNCs) {
+      hasSyncedLocalPNCs = true;
+      try {
+        const batch = writeBatch(db);
+        for (const pnc of cached) {
+          batch.set(doc(db, COLLECTIONS.PNCS, pnc.id), pnc, { merge: true });
+        }
+        await batch.commit();
+      } catch (err) {
+        console.warn('Could not auto-sync PNC records to Firestore:', err);
+      }
+      onUpdate(cached);
+      return;
+    }
+
+    hasSyncedLocalPNCs = true;
+
+    if (list.length > 0) {
+      setCachedData(CACHE_KEYS.PNCS, list);
+      onUpdate(list);
+    } else if (snapshot.empty && (!cached || cached.length === 0)) {
+      setCachedData(CACHE_KEYS.PNCS, []);
+      onUpdate([]);
+    }
   }, (error) => {
     console.error('Error listening to PNCs in Firestore, using cache fallback:', error);
     onUpdate(getCachedData<PNCRecord[]>(CACHE_KEYS.PNCS, []));

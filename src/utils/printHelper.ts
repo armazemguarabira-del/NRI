@@ -108,7 +108,7 @@ export function executePrintJob(elementId: string, documentTitle = 'Etiquetas_Pa
         flex-direction: column !important;
         justify-content: space-between !important;
         gap: 1.5mm !important;
-        padding: 3mm 4mm !important;
+        padding: 2mm 3mm !important;
         margin: 0 auto !important;
         box-sizing: border-box !important;
         overflow: hidden !important;
@@ -120,16 +120,16 @@ export function executePrintJob(elementId: string, documentTitle = 'Etiquetas_Pa
       }
 
       .nri-label-card-4 {
-        height: 68.5mm !important;
-        max-height: 68.5mm !important;
-        min-height: 66mm !important;
+        height: 63.5mm !important;
+        max-height: 63.5mm !important;
+        min-height: 63.5mm !important;
         flex: 1 1 0 !important;
         overflow: hidden !important;
         box-sizing: border-box !important;
         page-break-inside: avoid !important;
         break-inside: avoid !important;
         border: 2px solid #000000 !important;
-        padding: 1.5mm 2mm !important;
+        padding: 1mm 1.5mm !important;
         display: flex !important;
         flex-direction: column !important;
         justify-content: space-between !important;

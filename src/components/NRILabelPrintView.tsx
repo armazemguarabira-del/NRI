@@ -392,52 +392,52 @@ const LabelCard: React.FC<LabelCardProps> = ({ entry, currentPull, brand, varian
     <div
       className={`bg-white text-black border-2 border-black font-sans box-border flex flex-col justify-between overflow-hidden ${
         isCompact 
-          ? 'nri-label-card-4 p-1 sm:p-1.5 h-full max-h-[68.5mm] min-h-[66mm] print:h-[68.5mm] print:max-h-[68.5mm] print:min-h-[66mm] rounded-none' 
+          ? 'nri-label-card-4 p-1 h-[63.5mm] max-h-[63.5mm] min-h-[63.5mm] print:h-[63.5mm] print:max-h-[63.5mm] print:min-h-[63.5mm] rounded-none' 
           : variant === 'a4_double'
           ? 'p-4 h-full min-h-[130mm]'
           : 'p-6 h-full min-h-[265mm]'
       }`}
     >
       {/* 1. TOP HEADER: AMBEV on the Left + PAU BRASIL GUARABIRA & LOGO on the Right */}
-      <div className={`flex items-center justify-between border-b-2 border-black ${isCompact ? 'pb-0.5 mb-0.5 min-h-[24px]' : 'pb-2 mb-2 min-h-[46px]'}`}>
+      <div className={`flex items-center justify-between border-b ${isCompact ? 'border-black pb-0.5 mb-0.5 min-h-[18px]' : 'border-b-2 border-black pb-2 mb-2 min-h-[46px]'}`}>
         {/* Left: AMBEV */}
-        <div className="flex items-center gap-1.5 shrink-0">
+        <div className="flex items-center gap-1 shrink-0">
           {brand.secondaryLogoUrl ? (
             <img 
               src={brand.secondaryLogoUrl} 
               alt="Ambev" 
-              className={isCompact ? "h-5 sm:h-5.5 max-h-6 max-w-[70px] object-contain" : "h-9 max-h-9 max-w-[120px] object-contain"} 
+              className={isCompact ? "h-4 max-h-4 max-w-[65px] object-contain" : "h-9 max-h-9 max-w-[120px] object-contain"} 
               referrerPolicy="no-referrer"
             />
           ) : (
-            <span className={`font-black tracking-tight lowercase font-sans text-[#002B7F] ${isCompact ? 'text-xl sm:text-[22px] leading-none' : 'text-3xl sm:text-4xl leading-none'}`}>
+            <span className={`font-black tracking-tight lowercase font-sans text-[#002B7F] ${isCompact ? 'text-lg sm:text-[19px] leading-none' : 'text-3xl sm:text-4xl leading-none'}`}>
               ambev
             </span>
           )}
         </div>
 
         {/* Right: PAU BRASIL GUARABIRA + LOGO */}
-        <div className="flex items-center gap-1.5 justify-end shrink-0 max-w-[75%]">
-          <span className={`font-black uppercase tracking-tight text-[#002B7F] font-sans leading-none truncate ${isCompact ? 'text-[11px] sm:text-xs md:text-[13px]' : 'text-2xl sm:text-3xl'}`}>
+        <div className="flex items-center gap-1 justify-end shrink-0 max-w-[78%]">
+          <span className={`font-black uppercase tracking-tight text-[#002B7F] font-sans leading-none truncate ${isCompact ? 'text-[10.5px] sm:text-[11.5px]' : 'text-2xl sm:text-3xl'}`}>
             {brand.companyName || 'PAU BRASIL GUARABIRA'}
           </span>
           {brand.primaryLogoUrl ? (
             <img 
               src={brand.primaryLogoUrl} 
               alt="Logo Pau Brasil" 
-              className={isCompact ? "h-5 sm:h-5.5 max-h-6 max-w-[70px] object-contain shrink-0" : "h-10 max-h-10 max-w-[120px] object-contain shrink-0"} 
+              className={isCompact ? "h-4 max-h-4 max-w-[65px] object-contain shrink-0" : "h-10 max-h-10 max-w-[120px] object-contain shrink-0"} 
               referrerPolicy="no-referrer"
             />
           ) : (
-            <PauBrasilLogo size={isCompact ? "sm" : "md"} showText={false} className="shrink-0 scale-90 sm:scale-100" />
+            <PauBrasilLogo size={isCompact ? "sm" : "md"} showText={false} className="shrink-0 scale-75 sm:scale-85" />
           )}
         </div>
       </div>
 
       {/* 2. PRODUCT CODE & DESCRIPTION CENTERED */}
-      <div className={`text-center font-black uppercase text-black tracking-tight leading-tight px-0.5 truncate ${
+      <div className={`text-center font-black uppercase text-black tracking-tight leading-none px-0.5 truncate ${
         isCompact 
-          ? 'text-[13px] sm:text-[14px] md:text-[15px] py-0 my-0' 
+          ? 'text-[11.5px] sm:text-[12.5px] py-0.5 my-0' 
           : variant === 'a4_double'
           ? 'text-2xl sm:text-[28px] my-3'
           : 'text-3xl sm:text-4xl my-4'
@@ -448,103 +448,103 @@ const LabelCard: React.FC<LabelCardProps> = ({ entry, currentPull, brand, varian
       {/* 3. HERO SECTION: "Carreg até:" + GIANT BLACK BOX + CURVA ABC */}
       <div className={`flex items-stretch justify-between gap-1 ${isCompact ? 'my-0.5' : 'my-2.5'}`}>
         {/* Left: Carreg até: */}
-        <div className={`text-right flex flex-col justify-center leading-tight shrink-0 pr-1 ${isCompact ? 'min-w-[46px] sm:min-w-[52px]' : 'min-w-[85px]'}`}>
-          <span className={`font-black uppercase text-black leading-none ${isCompact ? 'text-[10px] sm:text-[11px]' : 'text-base sm:text-lg'}`}>Carreg</span>
-          <span className={`font-black uppercase text-black leading-none ${isCompact ? 'text-[10px] sm:text-[11px]' : 'text-base sm:text-lg'}`}>até:</span>
+        <div className={`text-right flex flex-col justify-center leading-tight shrink-0 pr-1 ${isCompact ? 'min-w-[42px]' : 'min-w-[85px]'}`}>
+          <span className={`font-black uppercase text-black leading-none ${isCompact ? 'text-[9px] sm:text-[9.5px]' : 'text-base sm:text-lg'}`}>Carreg</span>
+          <span className={`font-black uppercase text-black leading-none ${isCompact ? 'text-[9px] sm:text-[9.5px]' : 'text-base sm:text-lg'}`}>até:</span>
         </div>
 
         {/* Center: Giant Black Box with Load Until Date */}
         <div className={`flex-1 bg-black text-white text-center flex items-center justify-center ${isCompact ? 'py-0.5 px-1.5' : 'py-3.5 px-4'}`}>
-          <span className={`font-black font-mono tracking-wider text-white ${isCompact ? 'text-xl sm:text-[24px] md:text-[26px] leading-none' : 'text-5xl sm:text-6xl'}`}>
+          <span className={`font-black font-mono tracking-wider text-white ${isCompact ? 'text-lg sm:text-[21px] leading-none' : 'text-5xl sm:text-6xl'}`}>
             {formatDateBR(item.loadUntilDate || item.validityDate)}
           </span>
         </div>
 
         {/* Right: Curva Box */}
-        <div className={`border-2 border-black flex flex-col items-center justify-between shrink-0 text-center overflow-hidden bg-black ${isCompact ? 'min-w-[64px] sm:min-w-[72px]' : 'min-w-[110px]'}`}>
-          <div className={`bg-white text-black font-black tracking-wider border-b border-black w-full text-center ${isCompact ? 'text-[9px] sm:text-[10px] py-0.2 leading-none' : 'text-sm py-1'}`}>
+        <div className={`border border-black flex flex-col items-center justify-between shrink-0 text-center overflow-hidden bg-black ${isCompact ? 'min-w-[56px] sm:min-w-[62px]' : 'min-w-[110px]'}`}>
+          <div className={`bg-white text-black font-black tracking-wider border-b border-black w-full text-center ${isCompact ? 'text-[8px] py-0.2 leading-none' : 'text-sm py-1'}`}>
             CURVA
           </div>
-          <div className={`w-full flex-1 bg-black text-white font-black flex items-center justify-center font-mono ${isCompact ? 'text-xl sm:text-[26px] py-0.2 leading-none' : 'text-5xl py-2'}`}>
+          <div className={`w-full flex-1 bg-black text-white font-black flex items-center justify-center font-mono ${isCompact ? 'text-lg sm:text-[20px] py-0.2 leading-none' : 'text-5xl py-2'}`}>
             {item.abcClass || 'A'}
           </div>
         </div>
       </div>
 
       {/* 4. SUB-DATES: Pré-bloq, Recebimento & VALIDADE MAXIMIZADA EM NEGRITO */}
-      <div className={`flex items-center justify-between px-1.5 bg-slate-50 border-y-2 border-black font-sans ${isCompact ? 'py-0.5 my-0.5' : 'py-2 my-2'}`}>
-        <div className="flex items-center gap-2 sm:gap-3.5">
+      <div className={`flex items-center justify-between px-1 bg-slate-50 border-y ${isCompact ? 'border-black py-0.5 my-0.5' : 'border-y-2 border-black py-2 my-2'}`}>
+        <div className="flex items-center gap-2 sm:gap-3">
           <div>
-            <span className="font-black text-black uppercase text-[9.5px] sm:text-[10.5px]">Pré-bloq:</span>{' '}
-            <span className="font-mono font-black text-black text-[11px] sm:text-xs">
+            <span className="font-black text-black uppercase text-[8.5px] sm:text-[9.5px]">Pré-bloq:</span>{' '}
+            <span className="font-mono font-black text-black text-[10px] sm:text-[11px]">
               {formatDateBR(subtractDaysFromDate(item.validityDate, 30))}
             </span>
           </div>
           <div>
-            <span className="font-black text-black uppercase text-[9.5px] sm:text-[10.5px]">Receb:</span>{' '}
-            <span className="font-mono font-black text-black text-[11px] sm:text-xs">{formatDateBR(currentPull.header.receiptDate)}</span>
+            <span className="font-black text-black uppercase text-[8.5px] sm:text-[9.5px]">Receb:</span>{' '}
+            <span className="font-mono font-black text-black text-[10px] sm:text-[11px]">{formatDateBR(currentPull.header.receiptDate)}</span>
           </div>
         </div>
         <div className="flex items-baseline gap-1 text-right">
-          <span className="font-black uppercase text-black tracking-wider text-[11px] sm:text-xs md:text-sm">Validade:</span>{' '}
-          <span className={`font-mono font-black text-black underline decoration-[2.5px] ${isCompact ? 'text-lg sm:text-xl md:text-[22px] leading-none' : 'text-3xl sm:text-4xl'}`}>
+          <span className="font-black uppercase text-black tracking-wider text-[10px] sm:text-[11px]">Validade:</span>{' '}
+          <span className={`font-mono font-black text-black underline decoration-[2px] ${isCompact ? 'text-base sm:text-[17px] leading-none' : 'text-3xl sm:text-4xl'}`}>
             {formatDateBR(item.validityDate)}
           </span>
         </div>
       </div>
 
       {/* 5. 8-COLUMN METADATA GRID (CONFERENTE, TURNO, HORA, QTD TOTAL, QTD LASTRO, NOTA, ORIGEM, CARRETA) */}
-      <div className={`border-2 border-black grid grid-cols-[1.55fr_0.85fr_0.8fr_1fr_1fr_0.95fr_1.45fr_1.05fr] text-center divide-x-2 divide-black bg-white font-sans ${isCompact ? 'text-[7.5px] mt-0.5' : 'text-xs sm:text-sm'}`}>
-        <div className="p-0.5 px-1 flex flex-col justify-center overflow-hidden" title={currentPull.header.receiverName || 'GLADSON LISBOA'}>
-          <div className={`font-black uppercase text-slate-800 leading-none mb-0.5 ${isCompact ? 'text-[7px] sm:text-[7.5px]' : 'text-[10px]'}`}>CONFERENTE</div>
-          <div className={`font-black text-black truncate leading-tight ${isCompact ? 'text-[9px] sm:text-[10px]' : 'text-xs'}`}>{currentPull.header.receiverName || 'GLADSON LISBOA'}</div>
+      <div className={`border border-black grid grid-cols-[1.5fr_0.85fr_0.8fr_1fr_1fr_0.95fr_1.4fr_1.05fr] text-center divide-x divide-black bg-white font-sans ${isCompact ? 'text-[7px] mt-0.5' : 'text-xs sm:text-sm'}`}>
+        <div className="p-0.5 px-0.5 flex flex-col justify-center overflow-hidden" title={currentPull.header.receiverName || 'GLADSON LISBOA'}>
+          <div className={`font-black uppercase text-slate-800 leading-none mb-0.5 ${isCompact ? 'text-[6.5px]' : 'text-[10px]'}`}>CONFERENTE</div>
+          <div className={`font-black text-black truncate leading-tight ${isCompact ? 'text-[8.5px]' : 'text-xs'}`}>{currentPull.header.receiverName || 'GLADSON LISBOA'}</div>
         </div>
 
         <div className="p-0.5 flex flex-col justify-center overflow-hidden">
-          <div className={`font-black uppercase text-slate-800 leading-none mb-0.5 ${isCompact ? 'text-[7px] sm:text-[7.5px]' : 'text-[10px]'}`}>TURNO</div>
-          <div className={`font-black text-black leading-tight ${isCompact ? 'text-[9px] sm:text-[10px]' : 'text-xs'}`}>{currentPull.header.shift || 'Manhã'}</div>
+          <div className={`font-black uppercase text-slate-800 leading-none mb-0.5 ${isCompact ? 'text-[6.5px]' : 'text-[10px]'}`}>TURNO</div>
+          <div className={`font-black text-black leading-tight ${isCompact ? 'text-[8.5px]' : 'text-xs'}`}>{currentPull.header.shift || 'Manhã'}</div>
         </div>
 
         <div className="p-0.5 flex flex-col justify-center overflow-hidden">
-          <div className={`font-black uppercase text-slate-800 leading-none mb-0.5 ${isCompact ? 'text-[7px] sm:text-[7.5px]' : 'text-[10px]'}`}>HORA</div>
-          <div className={`font-black text-black font-mono leading-tight ${isCompact ? 'text-[9.5px] sm:text-[10.5px]' : 'text-xs'}`}>{currentPull.header.receiptTime || '08:32'}</div>
+          <div className={`font-black uppercase text-slate-800 leading-none mb-0.5 ${isCompact ? 'text-[6.5px]' : 'text-[10px]'}`}>HORA</div>
+          <div className={`font-black text-black font-mono leading-tight ${isCompact ? 'text-[8.5px]' : 'text-xs'}`}>{currentPull.header.receiptTime || '08:32'}</div>
         </div>
 
         <div className="p-0.5 flex flex-col justify-center bg-slate-50 overflow-hidden">
-          <div className={`font-black uppercase text-slate-800 leading-none mb-0.5 ${isCompact ? 'text-[7px] sm:text-[7.5px]' : 'text-[10px]'}`}>QTD TOTAL</div>
+          <div className={`font-black uppercase text-slate-800 leading-none mb-0.5 ${isCompact ? 'text-[6.5px]' : 'text-[10px]'}`}>QTD TOTAL</div>
           {displayQuantityTotal === 'CADASTRAR' ? (
-            <span className={`font-black text-amber-800 bg-amber-100 border border-amber-300 rounded px-0.5 py-0.2 tracking-tighter uppercase leading-none truncate inline-block ${isCompact ? 'text-[6px]' : 'text-[9px]'}`}>
+            <span className={`font-black text-amber-800 bg-amber-100 border border-amber-300 rounded px-0.5 py-0.2 tracking-tighter uppercase leading-none truncate inline-block ${isCompact ? 'text-[5.5px]' : 'text-[9px]'}`}>
               CADASTRAR
             </span>
           ) : (
-            <div className={`font-black text-black font-mono leading-tight ${isCompact ? 'text-[10.5px] sm:text-[11.5px]' : 'text-sm'}`}>{displayQuantityTotal}</div>
+            <div className={`font-black text-black font-mono leading-tight ${isCompact ? 'text-[9.5px]' : 'text-sm'}`}>{displayQuantityTotal}</div>
           )}
         </div>
 
         <div className="p-0.5 flex flex-col justify-center bg-slate-50 overflow-hidden">
-          <div className={`font-black uppercase text-slate-800 leading-none mb-0.5 ${isCompact ? 'text-[7px] sm:text-[7.5px]' : 'text-[10px]'}`}>QTD LASTRO</div>
+          <div className={`font-black uppercase text-slate-800 leading-none mb-0.5 ${isCompact ? 'text-[6.5px]' : 'text-[10px]'}`}>QTD LASTRO</div>
           {displayQuantityLastro === 'CADASTRAR' ? (
-            <span className={`font-black text-amber-800 bg-amber-100 border border-amber-300 rounded px-0.5 py-0.2 tracking-tighter uppercase leading-none truncate inline-block ${isCompact ? 'text-[6px]' : 'text-[9px]'}`}>
+            <span className={`font-black text-amber-800 bg-amber-100 border border-amber-300 rounded px-0.5 py-0.2 tracking-tighter uppercase leading-none truncate inline-block ${isCompact ? 'text-[5.5px]' : 'text-[9px]'}`}>
               CADASTRAR
             </span>
           ) : (
-            <div className={`font-black text-black font-mono leading-tight ${isCompact ? 'text-[10.5px] sm:text-[11.5px]' : 'text-sm'}`}>{displayQuantityLastro}</div>
+            <div className={`font-black text-black font-mono leading-tight ${isCompact ? 'text-[9.5px]' : 'text-sm'}`}>{displayQuantityLastro}</div>
           )}
         </div>
 
         <div className="p-0.5 flex flex-col justify-center overflow-hidden">
-          <div className={`font-black uppercase text-slate-800 leading-none mb-0.5 ${isCompact ? 'text-[7px] sm:text-[7.5px]' : 'text-[10px]'}`}>NOTA</div>
-          <div className={`font-black text-black font-mono truncate leading-tight ${isCompact ? 'text-[9.5px] sm:text-[10.5px]' : 'text-xs'}`}>{currentPull.header.nfeNumber}</div>
+          <div className={`font-black uppercase text-slate-800 leading-none mb-0.5 ${isCompact ? 'text-[6.5px]' : 'text-[10px]'}`}>NOTA</div>
+          <div className={`font-black text-black font-mono truncate leading-tight ${isCompact ? 'text-[8.5px]' : 'text-xs'}`}>{currentPull.header.nfeNumber}</div>
         </div>
 
         <div className="p-0.5 px-0.5 flex flex-col justify-center overflow-hidden" title={currentPull.header.factoryOrigin || 'F. Itapissuma'}>
-          <div className={`font-black uppercase text-slate-800 leading-none mb-0.5 ${isCompact ? 'text-[7px] sm:text-[7.5px]' : 'text-[10px]'}`}>ORIGEM</div>
-          <div className={`font-black text-black truncate leading-tight ${isCompact ? 'text-[8.5px] sm:text-[9.5px]' : 'text-xs'}`}>{currentPull.header.factoryOrigin || 'F. Itapissuma'}</div>
+          <div className={`font-black uppercase text-slate-800 leading-none mb-0.5 ${isCompact ? 'text-[6.5px]' : 'text-[10px]'}`}>ORIGEM</div>
+          <div className={`font-black text-black truncate leading-tight ${isCompact ? 'text-[8px]' : 'text-xs'}`}>{currentPull.header.factoryOrigin || 'F. Itapissuma'}</div>
         </div>
 
         <div className="p-0.5 flex flex-col justify-center overflow-hidden">
-          <div className={`font-black uppercase text-slate-800 leading-none mb-0.5 ${isCompact ? 'text-[7px] sm:text-[7.5px]' : 'text-[10px]'}`}>CARRETA</div>
-          <div className={`font-black text-black font-mono uppercase truncate leading-tight ${isCompact ? 'text-[9.5px] sm:text-[10.5px]' : 'text-xs'}`}>{currentPull.header.truckPlate || 'RLU3F59'}</div>
+          <div className={`font-black uppercase text-slate-800 leading-none mb-0.5 ${isCompact ? 'text-[6.5px]' : 'text-[10px]'}`}>CARRETA</div>
+          <div className={`font-black text-black font-mono uppercase truncate leading-tight ${isCompact ? 'text-[8.5px]' : 'text-xs'}`}>{currentPull.header.truckPlate || 'RLU3F59'}</div>
         </div>
       </div>
     </div>
