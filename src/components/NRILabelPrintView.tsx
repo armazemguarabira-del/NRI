@@ -50,8 +50,8 @@ export const NRILabelPrintView: React.FC<NRILabelPrintViewProps> = ({
   const handleBack = onBack || onBackToForm;
 
   const [selectedProductFilter, setSelectedProductFilter] = useState<string>('ALL');
-  const [facesPerPallet, setFacesPerPallet] = useState<number>(4); // Default 4 faces per pallet (Frente, Verso, Dir, Esq)
-  const [printSize, setPrintSize] = useState<'a4_4_per_page' | 'a4_double' | 'a4_single' | 'thermal'>('a4_4_per_page'); // Default: 4 labels per A4 sheet (2x2 grid)
+  const [facesPerPallet, setFacesPerPallet] = useState<number>(4); // 4 faces per pallet (Frente, Verso, Dir, Esq) = 1 folha A4 por pallet
+  const [printSize, setPrintSize] = useState<'a4_4_per_page' | 'a4_double' | 'a4_single' | 'thermal'>('a4_4_per_page'); // 4 labels per A4 sheet (1x4 vertical)
   const [showLocalBrandingModal, setShowLocalBrandingModal] = useState(false);
 
   const [brand, setBrand] = useState<BrandSettings>(getStoredBrandSettings);
@@ -86,8 +86,7 @@ export const NRILabelPrintView: React.FC<NRILabelPrintViewProps> = ({
     );
   }
 
-  // Generate NRI Labels per Pallet / Lastro fraction
-  // For each pallet, generate 4 labels (1 for each face, 4 per A4 sheet)
+  // Generate NRI Labels (Strictly 4 NRI labels per physical pallet - 1 pallet = 4 labels / 1 A4 sheet, 2 pallets = 8 labels / 2 A4 sheets)
   const printableList: PrintablePalletFace[] = [];
   let globalPalletCounter = 1;
   const totalPalletsInPull = Math.max(1, Math.round(currentPull.totalPallets || currentPull.items.length));
@@ -118,7 +117,7 @@ export const NRILabelPrintView: React.FC<NRILabelPrintViewProps> = ({
       ? registeredPalletFactor
       : (item.quantitySku > 0 && item.palletCount > 0 ? Math.round(item.quantitySku / item.palletCount) : item.quantitySku || 0);
 
-    // If wholePallets is 0 and fractionalPart is 0 (or item.palletCount <= 0), treat as 1 pallet
+    // If wholePallets is 0 and no fraction (or item.palletCount <= 0), generate 1 pallet (4 labels)
     if (wholePallets <= 0 && fractionalPart <= 0) {
       const explicitPalletNum = item.palletNumber || itemIdx + 1;
       for (let f = 1; f <= facesPerPallet; f++) {
@@ -140,6 +139,7 @@ export const NRILabelPrintView: React.FC<NRILabelPrintViewProps> = ({
       return;
     }
 
+    // For each complete pallet (1 pallet = 4 NRI labels)
     for (let p = 1; p <= wholePallets; p++) {
       const currentGlobalIdx = item.palletNumber ? item.palletNumber : globalPalletCounter;
       for (let f = 1; f <= facesPerPallet; f++) {
@@ -160,7 +160,7 @@ export const NRILabelPrintView: React.FC<NRILabelPrintViewProps> = ({
       globalPalletCounter++;
     }
 
-    // Fractional pallet (Pallet Falho: 1 falho = 4 labels with 100% of all information)
+    // Fractional pallet (Pallet Falho: 1 falho = 4 labels for this pallet)
     if (fractionalPart > 0) {
       const remainingSku = item.quantitySku > 0 && wholePallets > 0
         ? (item.quantitySku - (wholePallets * (qtyPerPallet || 1)))
@@ -312,17 +312,17 @@ export const NRILabelPrintView: React.FC<NRILabelPrintViewProps> = ({
       {/* Pages Render Container */}
       <div 
         id="printable-sheets-container" 
-        className="flex flex-col items-center justify-center gap-8 print:gap-0 print:m-0 print:p-0 w-full"
+        className="flex flex-col items-center justify-center gap-6 print:gap-0 print:m-0 print:p-0 w-full"
       >
         {pagedSheets.map((sheet, sheetIdx) => (
           <div
             key={`sheet-${sheetIdx}`}
             className={
               printSize === 'a4_4_per_page'
-                ? "a4-print-sheet-4 w-[202mm] max-w-full bg-white p-2 print:p-0 border border-slate-300 print:border-none shadow-md print:shadow-none mb-6 print:mb-0 grid grid-cols-1 grid-rows-4 gap-1.5 h-auto min-h-[280mm] max-h-none print:h-[280mm] print:max-h-[280mm] print:min-h-[280mm]"
+                ? "a4-print-sheet-4 w-[210mm] max-w-full bg-white p-3 print:p-0 border border-slate-300 print:border-none shadow-md print:shadow-none mb-6 print:mb-0 flex flex-col justify-between"
                 : printSize === 'a4_double'
-                ? "a4-print-sheet-2 w-[202mm] max-w-full bg-white p-4 print:p-0 border border-slate-300 print:border-none shadow-md print:shadow-none mb-6 print:mb-0 grid grid-cols-1 grid-rows-2 gap-4 h-auto min-h-[280mm] print:h-[280mm] print:max-h-[280mm]"
-                : "a4-print-sheet-1 w-[202mm] max-w-full bg-white p-6 print:p-0 border border-slate-300 print:border-none shadow-md print:shadow-none mb-6 print:mb-0 flex flex-col justify-between h-auto min-h-[280mm] print:h-[280mm] print:max-h-[280mm]"
+                ? "a4-print-sheet-2 w-[210mm] max-w-full bg-white p-4 print:p-0 border border-slate-300 print:border-none shadow-md print:shadow-none mb-6 print:mb-0 flex flex-col justify-between"
+                : "a4-print-sheet-1 w-[210mm] max-w-full bg-white p-6 print:p-0 border border-slate-300 print:border-none shadow-md print:shadow-none mb-6 print:mb-0 flex flex-col justify-between"
             }
             style={{
               fontFamily: "'Plus Jakarta Sans', Arial, sans-serif",
@@ -392,7 +392,7 @@ const LabelCard: React.FC<LabelCardProps> = ({ entry, currentPull, brand, varian
     <div
       className={`bg-white text-black border-2 border-black font-sans box-border flex flex-col justify-between overflow-hidden ${
         isCompact 
-          ? 'p-1 sm:p-1.5 h-full max-h-[68mm] min-h-[64mm] print:h-[68mm] print:max-h-[68mm] print:min-h-[68mm] rounded-none' 
+          ? 'nri-label-card-4 p-1 sm:p-1.5 h-full max-h-[68.5mm] min-h-[66mm] print:h-[68.5mm] print:max-h-[68.5mm] print:min-h-[66mm] rounded-none' 
           : variant === 'a4_double'
           ? 'p-4 h-full min-h-[130mm]'
           : 'p-6 h-full min-h-[265mm]'

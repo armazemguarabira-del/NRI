@@ -13,7 +13,9 @@ import {
   CheckCircle2,
   Trash2,
   TrendingDown,
-  Layers
+  Layers,
+  Edit3,
+  AlertCircle
 } from 'lucide-react';
 import { PullRecord, PullFilterState, NRIItem } from '../types';
 import { formatDateBR, formatBRL, getAbcBadgeColor } from '../utils/nriCalculations';
@@ -24,13 +26,15 @@ interface MonthlyHistoryViewProps {
   onSelectPullForLabels: (pull: PullRecord) => void;
   onSelectPullForSheet: (pull: PullRecord) => void;
   onDeletePull: (pullId: string) => void;
+  onEditPull?: (pull: PullRecord) => void;
 }
 
 export const MonthlyHistoryView: React.FC<MonthlyHistoryViewProps> = ({
   pulls,
   onSelectPullForLabels,
   onSelectPullForSheet,
-  onDeletePull
+  onDeletePull,
+  onEditPull
 }) => {
   // Filters State
   const [filters, setFilters] = useState<PullFilterState>({
@@ -46,6 +50,7 @@ export const MonthlyHistoryView: React.FC<MonthlyHistoryViewProps> = ({
   });
 
   const [expandedPullId, setExpandedPullId] = useState<string | null>(null);
+  const [pullToDelete, setPullToDelete] = useState<PullRecord | null>(null);
   const [currentPage, setCurrentPage] = useState<number>(1);
   const [pageSize, setPageSize] = useState<number>(20);
 
@@ -469,6 +474,17 @@ export const MonthlyHistoryView: React.FC<MonthlyHistoryViewProps> = ({
                       </div>
                     </div>
 
+                    {onEditPull && (
+                      <button
+                        onClick={() => onEditPull(pull)}
+                        className="px-2.5 py-2 bg-blue-50 hover:bg-blue-100 text-blue-800 rounded-lg text-xs font-bold transition-colors flex items-center gap-1 border border-blue-200"
+                        title="Corrigir / Editar esta Puxada"
+                      >
+                        <Edit3 className="w-3.5 h-3.5 text-blue-600" />
+                        <span className="hidden md:inline">Corrigir</span>
+                      </button>
+                    )}
+
                     <button
                       onClick={() => onSelectPullForSheet(pull)}
                       className="p-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-bold transition-colors flex items-center gap-1"
@@ -495,12 +511,9 @@ export const MonthlyHistoryView: React.FC<MonthlyHistoryViewProps> = ({
                     </button>
 
                     <button
-                      onClick={() => {
-                        if (confirm(`Deseja excluir o registro da NF ${pull.header.nfeNumber}?`)) {
-                          onDeletePull(pull.header.id);
-                        }
-                      }}
-                      className="p-2 text-slate-400 hover:text-red-600 transition-colors"
+                      type="button"
+                      onClick={() => setPullToDelete(pull)}
+                      className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
                       title="Excluir Puxada"
                     >
                       <Trash2 className="w-4 h-4" />
@@ -640,6 +653,68 @@ export const MonthlyHistoryView: React.FC<MonthlyHistoryViewProps> = ({
               </button>
             </div>
           )}
+        </div>
+      )}
+
+      {/* MODAL DE CONFIRMAÇÃO DE EXCLUSÃO (100% IN-APP, SEM BLOQUEIO DE IFRAME) */}
+      {pullToDelete && (
+        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-slate-200 animate-in fade-in zoom-in duration-150">
+            <div className="flex items-center gap-3 text-red-600 mb-4">
+              <div className="w-12 h-12 rounded-xl bg-red-100 flex items-center justify-center shrink-0">
+                <Trash2 className="w-6 h-6 text-red-600" />
+              </div>
+              <div>
+                <h3 className="text-lg font-black text-slate-900">Confirmar Exclusão</h3>
+                <p className="text-xs text-slate-500">Esta ação removerá a puxada permanentemente do sistema.</p>
+              </div>
+            </div>
+
+            <div className="bg-slate-50 rounded-xl p-4 border border-slate-200 text-xs space-y-2 mb-6">
+              <div className="flex justify-between items-center pb-2 border-b border-slate-200">
+                <span className="text-slate-500">Nota Fiscal:</span>
+                <span className="font-mono font-black text-slate-900 text-sm">{pullToDelete.header.nfeNumber}</span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-slate-500">Placa da Carreta:</span>
+                <span className="font-mono font-bold text-slate-800">{pullToDelete.header.truckPlate}</span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-slate-500">Fábrica de Origem:</span>
+                <span className="font-bold text-slate-800">{pullToDelete.header.factoryOrigin}</span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-slate-500">Volume Recebido:</span>
+                <span className="font-mono font-bold text-slate-800">{pullToDelete.totalPallets} Pallets ({pullToDelete.totalSku} SKUs)</span>
+              </div>
+              <div className="flex justify-between items-center pt-1">
+                <span className="text-slate-500">Data de Recebimento:</span>
+                <span className="font-mono text-slate-700">{formatDateBR(pullToDelete.header.receiptDate)} às {pullToDelete.header.receiptTime}</span>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-3">
+              <button
+                type="button"
+                onClick={() => setPullToDelete(null)}
+                className="px-4 py-2.5 rounded-xl border border-slate-300 text-slate-700 hover:bg-slate-100 text-xs font-bold transition-all"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  const id = pullToDelete.header.id;
+                  setPullToDelete(null);
+                  onDeletePull(id);
+                }}
+                className="px-5 py-2.5 rounded-xl bg-red-600 hover:bg-red-700 text-white text-xs font-black transition-all shadow-md active:scale-95 flex items-center gap-1.5"
+              >
+                <Trash2 className="w-4 h-4" />
+                <span>Sim, Excluir Registro</span>
+              </button>
+            </div>
+          </div>
         </div>
       )}
 

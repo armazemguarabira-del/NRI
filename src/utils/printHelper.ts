@@ -22,7 +22,7 @@ export function executePrintJob(elementId: string, documentTitle = 'Etiquetas_Pa
     <style>
       @page {
         size: A4 portrait !important;
-        margin: 4mm 4mm !important;
+        margin: 0 !important;
       }
       *, *::before, *::after {
         box-sizing: border-box !important;
@@ -37,63 +37,150 @@ export function executePrintJob(elementId: string, documentTitle = 'Etiquetas_Pa
         width: 100% !important;
         height: auto !important;
         font-family: 'Plus Jakarta Sans', Arial, sans-serif !important;
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
       }
-      .a4-print-sheet-4 {
-        width: 100% !important;
-        max-width: 202mm !important;
-        height: 280mm !important;
-        max-height: 280mm !important;
-        min-height: 280mm !important;
-        page-break-after: always !important;
-        break-after: page !important;
-        page-break-inside: avoid !important;
-        break-inside: avoid !important;
-        display: grid !important;
-        grid-template-columns: 1fr !important;
-        grid-template-rows: repeat(4, 68mm) !important;
-        gap: 1.5mm !important;
-        padding: 0 !important;
-        margin: 0 auto !important;
-        box-sizing: border-box !important;
-        overflow: hidden !important;
-      }
-      .a4-print-sheet-4 > div {
-        height: 68mm !important;
-        max-height: 68mm !important;
-        min-height: 68mm !important;
-        overflow: hidden !important;
-        box-sizing: border-box !important;
-        page-break-inside: avoid !important;
-        break-inside: avoid !important;
-      }
-      .a4-print-sheet-4:last-child {
-        page-break-after: avoid !important;
-        break-after: avoid !important;
-      }
+      
       .print-controls-bar {
         position: fixed;
         top: 0;
         left: 0;
         right: 0;
-        background: #1e293b;
+        background: #0f172a;
         color: #ffffff;
-        padding: 12px 20px;
+        padding: 10px 20px;
         display: flex;
         align-items: center;
         justify-content: space-between;
-        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+        box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
         z-index: 999999;
         font-family: sans-serif;
       }
+
+      @media screen {
+        body {
+          background-color: #e2e8f0 !important;
+          padding-top: 55px !important;
+          padding-bottom: 40px !important;
+        }
+        .print-content-wrapper {
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          gap: 20px;
+          padding: 10px;
+        }
+        .a4-print-sheet-4, .a4-print-sheet-2, .a4-print-sheet-1 {
+          background: #ffffff !important;
+          box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15) !important;
+        }
+      }
+
       @media print {
+        body {
+          background-color: #ffffff !important;
+          padding: 0 !important;
+          margin: 0 !important;
+        }
         .print-controls-bar, .no-print {
           display: none !important;
         }
         .print-content-wrapper {
-          padding-top: 0 !important;
           padding: 0 !important;
           margin: 0 !important;
+          width: 100% !important;
+          display: block !important;
         }
+      }
+
+      /* EXACT A4 SHEET: 210mm x 297mm - ZERO OVERFLOW, ZERO BLANK PAGES */
+      .a4-print-sheet-4 {
+        width: 210mm !important;
+        max-width: 210mm !important;
+        height: 296mm !important;
+        max-height: 296mm !important;
+        min-height: 296mm !important;
+        page-break-after: always !important;
+        break-after: page !important;
+        page-break-inside: avoid !important;
+        break-inside: avoid !important;
+        display: flex !important;
+        flex-direction: column !important;
+        justify-content: space-between !important;
+        gap: 1.5mm !important;
+        padding: 3mm 4mm !important;
+        margin: 0 auto !important;
+        box-sizing: border-box !important;
+        overflow: hidden !important;
+        background: #ffffff !important;
+      }
+      .a4-print-sheet-4:last-child, .a4-print-sheet-4:last-of-type {
+        page-break-after: auto !important;
+        break-after: auto !important;
+      }
+
+      .nri-label-card-4 {
+        height: 68.5mm !important;
+        max-height: 68.5mm !important;
+        min-height: 66mm !important;
+        flex: 1 1 0 !important;
+        overflow: hidden !important;
+        box-sizing: border-box !important;
+        page-break-inside: avoid !important;
+        break-inside: avoid !important;
+        border: 2px solid #000000 !important;
+        padding: 1.5mm 2mm !important;
+        display: flex !important;
+        flex-direction: column !important;
+        justify-content: space-between !important;
+        background: #ffffff !important;
+      }
+
+      .a4-print-sheet-2 {
+        width: 210mm !important;
+        max-width: 210mm !important;
+        height: 296mm !important;
+        max-height: 296mm !important;
+        page-break-after: always !important;
+        break-after: page !important;
+        page-break-inside: avoid !important;
+        break-inside: avoid !important;
+        display: flex !important;
+        flex-direction: column !important;
+        justify-content: space-between !important;
+        gap: 3mm !important;
+        padding: 4mm 5mm !important;
+        margin: 0 auto !important;
+        box-sizing: border-box !important;
+        overflow: hidden !important;
+        background: #ffffff !important;
+      }
+      .a4-print-sheet-2:last-child {
+        page-break-after: auto !important;
+        break-after: auto !important;
+      }
+
+      .a4-print-sheet-1 {
+        width: 210mm !important;
+        max-width: 210mm !important;
+        height: 296mm !important;
+        max-height: 296mm !important;
+        page-break-after: always !important;
+        break-after: page !important;
+        page-break-inside: avoid !important;
+        break-inside: avoid !important;
+        display: flex !important;
+        flex-direction: column !important;
+        justify-content: space-between !important;
+        padding: 5mm !important;
+        margin: 0 auto !important;
+        box-sizing: border-box !important;
+        overflow: hidden !important;
+        background: #ffffff !important;
+      }
+      .a4-print-sheet-1:last-child {
+        page-break-after: auto !important;
+        break-after: auto !important;
       }
     </style>
   `;
@@ -107,21 +194,22 @@ export function executePrintJob(elementId: string, documentTitle = 'Etiquetas_Pa
       ${stylesHtml}
       ${printCss}
     </head>
-    <body style="background:#ffffff; margin:0; padding:0;">
+    <body>
       <div class="print-controls-bar no-print">
-        <div style="font-weight:bold; font-size:14px;">
-          🖨️ Sistema NRI - Folha de Impressão de Etiquetas (4 por Folha A4)
+        <div style="font-weight:bold; font-size:13px; display:flex; align-items:center; gap:8px;">
+          <span>🖨️</span>
+          <span>Sistema NRI Pau Brasil Guarabira — Folha de Impressão Oficial</span>
         </div>
         <div style="display:flex; gap:10px;">
-          <button onclick="window.print()" style="background:#f59e0b; color:#000; font-weight:900; border:none; padding:8px 18px; border-radius:8px; cursor:pointer; font-size:13px;">
-            CLIQUE PARA IMPRIMIR AGORA
+          <button onclick="window.print()" style="background:#f59e0b; color:#000; font-weight:900; border:none; padding:7px 18px; border-radius:8px; cursor:pointer; font-size:13px; box-shadow: 0 2px 4px rgba(0,0,0,0.2);">
+            IMPRIMIR AGORA
           </button>
-          <button onclick="window.close()" style="background:#475569; color:#fff; font-weight:bold; border:none; padding:8px 14px; border-radius:8px; cursor:pointer; font-size:13px;">
-            Fechar Janela
+          <button onclick="window.close()" style="background:#334155; color:#fff; font-weight:bold; border:none; padding:7px 14px; border-radius:8px; cursor:pointer; font-size:13px;">
+            Fechar
           </button>
         </div>
       </div>
-      <div style="padding-top: 50px;" class="print-content-wrapper">
+      <div class="print-content-wrapper">
         ${contentElement.innerHTML}
       </div>
       <script>

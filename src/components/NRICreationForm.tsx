@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { 
   Plus, 
   Trash2, 
@@ -38,6 +38,7 @@ interface NRICreationFormProps {
   onNavigateToAlerts?: () => void;
   onQuickRegisterProduct?: (item: ProductCatalogItem) => void;
   initialPull?: PullRecord | null;
+  onCancelEdit?: () => void;
   currentUser?: UserAccount | null;
 }
 
@@ -63,6 +64,7 @@ export const NRICreationForm: React.FC<NRICreationFormProps> = ({
   onNavigateToAlerts,
   onQuickRegisterProduct,
   initialPull,
+  onCancelEdit,
   currentUser
 }) => {
   // Compute available factories/suppliers from dynamic list or initial
@@ -86,11 +88,10 @@ export const NRICreationForm: React.FC<NRICreationFormProps> = ({
     abcClass: 'A',
     defaultShelfLifeDays: 180
   });
-  // Header State (without Entrada Promax, Pallets PBRI and Chapatex inputs)
-  const [header, setHeader] = useState<NRIPullHeader>(() => {
+
+  const getEmptyHeader = (): NRIPullHeader => {
     const todayStr = new Date().toISOString().split('T')[0];
     const defaultFactory = availableSuppliers[0] ? `${availableSuppliers[0].code} - ${availableSuppliers[0].name}` : '950 - ITAPISSUMA';
-    if (initialPull) return { ...initialPull.header, issueDate: todayStr };
     return {
       id: `pull-${Date.now()}`,
       nfeNumber: '',
@@ -111,10 +112,33 @@ export const NRICreationForm: React.FC<NRICreationFormProps> = ({
       notes: '',
       createdAt: new Date().toISOString()
     };
+  };
+
+  // Header State (without Entrada Promax, Pallets PBRI and Chapatex inputs)
+  const [header, setHeader] = useState<NRIPullHeader>(() => {
+    if (initialPull) return { ...initialPull.header };
+    return getEmptyHeader();
   });
 
+  // Line items state
+  const [items, setItems] = useState<NRIItem[]>(() => {
+    if (initialPull && initialPull.items.length > 0) return [...initialPull.items];
+    return [];
+  });
+
+  // Keep state synchronized with initialPull when editing is triggered or cancelled
+  useEffect(() => {
+    if (initialPull) {
+      setHeader({ ...initialPull.header });
+      setItems([...initialPull.items]);
+    } else {
+      setHeader(getEmptyHeader());
+      setItems([]);
+    }
+  }, [initialPull]);
+
   // Sync logged in user if changed
-  React.useEffect(() => {
+  useEffect(() => {
     if (currentUser?.fullName && !initialPull) {
       setHeader(prev => ({
         ...prev,
@@ -123,11 +147,14 @@ export const NRICreationForm: React.FC<NRICreationFormProps> = ({
     }
   }, [currentUser, initialPull]);
 
-  // Line items state - starts empty for pristine manual entry
-  const [items, setItems] = useState<NRIItem[]>(() => {
-    if (initialPull && initialPull.items.length > 0) return initialPull.items;
-    return [];
-  });
+  const handleResetToNew = () => {
+    if (onCancelEdit) {
+      onCancelEdit();
+    }
+    setHeader(getEmptyHeader());
+    setItems([]);
+    setValidationError(null);
+  };
 
   // Selected quick search for adding new product
   const [selectedCatalogProduct, setSelectedCatalogProduct] = useState<ProductCatalogItem>(catalog[0]);
@@ -422,6 +449,40 @@ export const NRICreationForm: React.FC<NRICreationFormProps> = ({
           </button>
         </div>
       )}
+
+      {/* EDITING MODE ACTIVE BANNER */}
+      {initialPull && (
+        <div className="p-4 bg-blue-50 border-2 border-blue-400 rounded-2xl flex flex-wrap items-center justify-between gap-4 text-blue-950 animate-in fade-in shadow-sm">
+          <div className="flex items-center gap-3.5">
+            <div className="w-10 h-10 rounded-xl bg-blue-600 text-white flex items-center justify-center font-black text-sm shrink-0 shadow-xs">
+              NF
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <h3 className="text-sm font-black uppercase tracking-wide text-blue-900">
+                  Modo de Correção / Edição Ativo: NF {header.nfeNumber || initialPull.header.nfeNumber}
+                </h3>
+                <span className="px-2 py-0.5 bg-blue-200 text-blue-900 font-mono font-bold rounded text-[11px]">
+                  {header.truckPlate || initialPull.header.truckPlate}
+                </span>
+              </div>
+              <p className="text-xs text-blue-700 font-medium mt-0.5">
+                Altere os dados do cabeçalho, quantidades de pallets/SKU ou validades. Ao salvar, as alterações serão atualizadas em tempo real.
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={handleResetToNew}
+              className="px-3.5 py-2 bg-white hover:bg-slate-100 text-slate-700 font-bold rounded-xl text-xs border border-slate-300 transition-colors shadow-2xs"
+            >
+              Cancelar Edição / Nova Puxada
+            </button>
+          </div>
+        </div>
+      )}
       
       {/* TOP TITLE & LOGO WITH PAU BRASIL GUARABIRA */}
       <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs flex flex-wrap items-center justify-between gap-4">
@@ -433,24 +494,38 @@ export const NRICreationForm: React.FC<NRICreationFormProps> = ({
                 PAU BRASIL GUARABIRA
               </h1>
               <span className="text-[11px] bg-slate-900 text-amber-400 px-2.5 py-0.5 rounded-full font-mono font-bold">
-                GERAÇÃO NRI
+                {initialPull ? 'CORREÇÃO DE PUXADA' : 'GERAÇÃO NRI'}
               </span>
             </div>
             <p className="text-xs text-slate-500 font-medium mt-0.5">
-              Entrada de carretas, sincronização automática de pallets/lastros/SKU e emissão das 4 faces NRI.
+              {initialPull 
+                ? `Editando registro da NF ${header.nfeNumber || initialPull.header.nfeNumber} e ajustando itens/pallets.`
+                : 'Entrada de carretas, sincronização automática de pallets/lastros/SKU e emissão das 4 faces NRI.'}
             </p>
           </div>
         </div>
 
         <div className="flex items-center gap-2">
-          <button
-            type="button"
-            onClick={handleLoadSample}
-            className="flex items-center gap-1.5 px-3.5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl transition-colors"
-          >
-            <Sparkles className="w-3.5 h-3.5 text-amber-500" />
-            <span>Carregar Exemplo (NF 1104458)</span>
-          </button>
+          {!initialPull && (
+            <button
+              type="button"
+              onClick={handleLoadSample}
+              className="flex items-center gap-1.5 px-3.5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl transition-colors"
+            >
+              <Sparkles className="w-3.5 h-3.5 text-amber-500" />
+              <span>Carregar Exemplo (NF 1104458)</span>
+            </button>
+          )}
+
+          {initialPull && (
+            <button
+              type="button"
+              onClick={handleResetToNew}
+              className="flex items-center gap-1.5 px-3.5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl transition-colors"
+            >
+              <span>+ Criar Nova Puxada</span>
+            </button>
+          )}
 
           <button
             type="button"

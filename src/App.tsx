@@ -268,6 +268,7 @@ export default function App() {
 
   // Currently Selected Pull for Printing
   const [selectedPull, setSelectedPull] = useState<PullRecord | null>(null);
+  const [editingPull, setEditingPull] = useState<PullRecord | null>(null);
 
   useEffect(() => {
     if (pulls.length > 0 && !selectedPull) {
@@ -287,6 +288,7 @@ export default function App() {
   // Handlers (Persisting directly to Firebase Firestore)
   const handleSavePull = async (newPull: PullRecord, printAction?: 'labels' | 'sheet' | null) => {
     // 1. Immediately update state & navigate for instant responsive UI
+    setEditingPull(null);
     setSelectedPull(newPull);
     setPulls(prev => [newPull, ...prev.filter(p => p.header.id !== newPull.header.id)]);
     
@@ -306,16 +308,27 @@ export default function App() {
     }
   };
 
+  const handleEditPull = (pull: PullRecord) => {
+    setEditingPull(pull);
+    setActiveTab('new_pull');
+  };
+
   const handleDeletePull = async (pullId: string) => {
+    // 1. Immediately remove from React state so UI updates instantly
+    setPulls(prev => prev.filter(p => p.header.id !== pullId));
+    if (selectedPull?.header.id === pullId) {
+      const remaining = pulls.filter(p => p.header.id !== pullId);
+      setSelectedPull(remaining[0] || null);
+    }
+    if (editingPull?.header.id === pullId) {
+      setEditingPull(null);
+    }
+
+    // 2. Remove from Firestore and local cache
     try {
       await deletePullFromFirestore(pullId);
-      if (selectedPull?.header.id === pullId) {
-        const remaining = pulls.filter(p => p.header.id !== pullId);
-        setSelectedPull(remaining[0] || null);
-      }
     } catch (e) {
       console.error('Error deleting pull from Firestore:', e);
-      setPulls(prev => prev.filter(p => p.header.id !== pullId));
     }
   };
 
@@ -551,6 +564,8 @@ export default function App() {
               onSavePull={handleSavePull}
               onNavigateToCatalog={() => setActiveTab('catalog')}
               onNavigateToAlerts={() => setActiveTab('alerts')}
+              initialPull={editingPull}
+              onCancelEdit={() => setEditingPull(null)}
               currentUser={currentUser}
               onQuickRegisterProduct={(newProd) => {
                 setCatalog(prev => {
@@ -570,6 +585,7 @@ export default function App() {
               onSelectPullForLabels={handleSelectPullForLabels}
               onSelectPullForSheet={handleSelectPullForSheet}
               onDeletePull={handleDeletePull}
+              onEditPull={handleEditPull}
             />
           )}
 
