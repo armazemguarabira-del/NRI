@@ -39,8 +39,8 @@
 
 @media print {
   @page {
-    margin: 0.4cm;
-    size: auto;
+    margin: 4mm;
+    size: A4 portrait;
   }
   
   body {
@@ -48,6 +48,8 @@
     color: #000000 !important;
     print-color-adjust: exact;
     -webkit-print-color-adjust: exact;
+    margin: 0 !important;
+    padding: 0 !important;
   }
 
   .no-print, header, nav, .print-hidden {
@@ -56,5 +58,67 @@
 
   .print-only {
     display: block !important;
+  }
+
+  /* 4 Labels per A4 sheet printing container */
+  .a4-print-sheet-4 {
+    width: 100% !important;
+    height: 285mm !important;
+    max-height: 285mm !important;
+    page-break-after: always !important;
+    break-after: page !important;
+    display: grid !important;
+    grid-template-columns: 1fr 1fr !important;
+    grid-template-rows: 1fr 1fr !important;
+    gap: 3.5mm !important;
+    padding: 0 !important;
+    margin: 0 auto !important;
+    box-sizing: border-box !important;
+    overflow: hidden !important;
+  }
+
+  .a4-print-sheet-4:last-child {
+    page-break-after: avoid !important;
+    break-after: avoid !important;
+  }
+
+  .a4-print-sheet-2 {
+    width: 100% !important;
+    height: 285mm !important;
+    max-height: 285mm !important;
+    page-break-after: always !important;
+    break-after: page !important;
+    display: grid !important;
+    grid-template-columns: 1fr !important;
+    grid-template-rows: 1fr 1fr !important;
+    gap: 4mm !important;
+    padding: 0 !important;
+    margin: 0 auto !important;
+    box-sizing: border-box !important;
+    overflow: hidden !important;
+  }
+
+  .a4-print-sheet-2:last-child {
+    page-break-after: avoid !important;
+    break-after: avoid !important;
+  }
+
+  .a4-print-sheet-1 {
+    width: 100% !important;
+    height: 285mm !important;
+    max-height: 285mm !important;
+    page-break-after: always !important;
+    break-after: page !important;
+    display: flex !important;
+    flex-direction: column !important;
+    justify-content: space-between !important;
+    padding: 4mm !important;
+    margin: 0 auto !important;
+    box-sizing: border-box !important;
+  }
+
+  .a4-print-sheet-1:last-child {
+    page-break-after: avoid !important;
+    break-after: avoid !important;
   }
 }

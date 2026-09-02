@@ -181,23 +181,23 @@ export default function App() {
 
   // Handlers (Persisting directly to Firebase Firestore)
   const handleSavePull = async (newPull: PullRecord, printAction?: 'labels' | 'sheet' | null) => {
+    // 1. Immediately update state & navigate for instant responsive UI
+    setSelectedPull(newPull);
+    setPulls(prev => [newPull, ...prev.filter(p => p.header.id !== newPull.header.id)]);
+    
+    if (printAction === 'sheet') {
+      setActiveTab('conference_sheet');
+    } else if (printAction === 'labels') {
+      setActiveTab('print_labels');
+    } else {
+      setActiveTab('history');
+    }
+
+    // 2. Persist to Firestore in background
     try {
-      // Save directly to Firestore (real-time listener updates state)
       await savePullToFirestore(newPull);
-      setSelectedPull(newPull);
-      
-      if (printAction === 'sheet') {
-        setActiveTab('conference_sheet');
-      } else if (printAction === 'labels') {
-        setActiveTab('print_labels');
-      } else {
-        setActiveTab('history');
-      }
     } catch (e) {
       console.error('Error saving pull to Firestore:', e);
-      // Fallback local update
-      setPulls(prev => [newPull, ...prev.filter(p => p.header.id !== newPull.header.id)]);
-      setSelectedPull(newPull);
     }
   };
 

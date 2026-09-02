@@ -7,6 +7,7 @@ import {
   FileText, 
   Save, 
   AlertTriangle, 
+  AlertCircle,
   Sparkles,
   Calculator,
   Truck,
@@ -59,6 +60,7 @@ export const NRICreationForm: React.FC<NRICreationFormProps> = ({
 }) => {
   // Modal for quick registration from form if product is missing
   const [showQuickRegisterModal, setShowQuickRegisterModal] = useState(false);
+  const [validationError, setValidationError] = useState<string | null>(null);
   const [quickRegDraft, setQuickRegDraft] = useState<ProductCatalogItem>({
     code: '',
     description: '',
@@ -296,21 +298,56 @@ export const NRICreationForm: React.FC<NRICreationFormProps> = ({
   };
 
   const handleSave = (printAction?: 'labels' | 'sheet' | null) => {
-    if (!header.nfeNumber || !header.truckPlate) {
-      alert('Preencha pelo menos a Nota Fiscal e a Placa da Carreta.');
+    setValidationError(null);
+
+    if (!header.nfeNumber?.trim()) {
+      setValidationError('Por favor, preencha o número da Nota Fiscal (NF).');
+      window.scrollTo({ top: 0, behavior: 'smooth' });
       return;
+    }
+
+    if (!header.truckPlate?.trim()) {
+      setValidationError('Por favor, preencha a Placa da Carreta.');
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      return;
+    }
+
+    // If no items have been added to the pull list yet
+    let currentItems = [...items];
+    if (currentItems.length === 0) {
+      if (selectedCatalogProduct) {
+        // Auto-add default row if product selected
+        const catItem = selectedCatalogProduct;
+        const itemValidity = quickValidity || '2027-04-15';
+        const newItemObj: Partial<NRIItem> = {
+          productCode: catItem.code,
+          description: catItem.description,
+          unit: catItem.unit,
+          validityDate: itemValidity,
+          palletCount: 1,
+          palletNumber: 1
+        };
+        const calculated = recalculateItem(newItemObj, catItem, header.receiptDate, 'pallet');
+        calculated.palletNumber = 1;
+        currentItems = [calculated];
+        setItems(currentItems);
+      } else {
+        setValidationError('Por favor, adicione pelo menos 1 produto na carga da puxada antes de salvar.');
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+        return;
+      }
     }
 
     const completePull: PullRecord = {
       header: {
         ...header,
-        pbr1Count: totalPallets
+        pbr1Count: totalPallets || currentItems.length
       },
-      items,
-      totalPallets,
-      totalSku,
-      totalHectoliters,
-      totalValue,
+      items: currentItems,
+      totalPallets: totalPallets || currentItems.length,
+      totalSku: totalSku || currentItems.reduce((acc, it) => acc + (Number(it.quantitySku) || 0), 0),
+      totalHectoliters: totalHectoliters || Number(currentItems.reduce((acc, it) => acc + (Number(it.totalHectoliter) || 0), 0).toFixed(2)),
+      totalValue: totalValue || Number(currentItems.reduce((acc, it) => acc + (Number(it.totalValue) || 0), 0).toFixed(2)),
       hasValidityAlert,
       alertCount: alertItems.length,
       averageStockAgeIndex: 90.5
@@ -321,6 +358,28 @@ export const NRICreationForm: React.FC<NRICreationFormProps> = ({
 
   return (
     <div className="max-w-7xl mx-auto p-4 sm:p-6 space-y-6">
+      
+      {/* VALIDATION WARNING BANNER */}
+      {validationError && (
+        <div className="p-4 bg-red-50 border-2 border-red-400 rounded-2xl flex items-center justify-between gap-3 text-red-900 animate-in fade-in shadow-md">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-xl bg-red-100 text-red-600 flex items-center justify-center shrink-0">
+              <AlertCircle className="w-5 h-5" />
+            </div>
+            <div>
+              <h4 className="text-xs font-black uppercase tracking-wider text-red-800">Atenção para Prosseguir</h4>
+              <p className="text-xs font-bold text-red-900">{validationError}</p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={() => setValidationError(null)}
+            className="text-red-500 hover:text-red-800 font-black p-1 text-sm cursor-pointer"
+          >
+            ✕
+          </button>
+        </div>
+      )}
       
       {/* TOP TITLE & LOGO WITH PAU BRASIL GUARABIRA */}
       <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs flex flex-wrap items-center justify-between gap-4">
