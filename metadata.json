@@ -1,0 +1,6 @@
+{
+  "name": "Sistema NRI & Gestão de Puxadas",
+  "description": "Sistema completo para controle de puxadas de carretas, cálculo automático de pallets e lastros, impressão de etiquetas NRI com Curva ABC, histórico de validades e análise de escoamento de estoque.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
