@@ -316,6 +316,7 @@ export const BlitzPuxadaView: React.FC<BlitzPuxadaViewProps> = ({
         lossValue: loss > 0 ? loss : Number((activePalletInspect.skuQuantity * activePalletInspect.unitPrice).toFixed(2)),
         validityDate: activePalletInspect.validityDate,
         requestedBy: conferenteName,
+        qualityIssueType: finalReason === 'Próximo da validade' ? 'Próximo da Validade' : finalReason === 'Vazamento' ? 'Vazamento em Massa' : 'Outro',
         reason: `Avaria detectada no Pallet Nº ${activePalletInspect.palletNumber}: ${finalReason}. ${notes}`
       });
     }

@@ -398,7 +398,7 @@ export default function App() {
           quantityBlocked: newBlitz.blockedQty,
           lossValue: newBlitz.lossValue,
           reason: `Avaria detectada na Blitz de Puxada (${newBlitz.damageType} - ${newBlitz.retainedQty} un retidas)`,
-          qualityIssueType: newBlitz.damageType === 'Vazamento' ? 'Vazamento em Massa' : 'Outro',
+          qualityIssueType: newBlitz.damageType === 'Vazamento' ? 'Vazamento em Massa' : newBlitz.damageType === 'Próximo da validade' ? 'Próximo da Validade' : 'Outro',
           requestedBy: newBlitz.conferente,
           requestDate: new Date().toISOString(),
           fiscalBlockStatus: 'PENDENTE'

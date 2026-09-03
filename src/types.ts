@@ -177,7 +177,7 @@ export interface PNCRecord {
   lossValue: number;
   blockedHectoliters?: number;
   reason: string;          // Motivo do bloqueio fiscal / Não conformidade
-  qualityIssueType: 'Corpo Estranho' | 'Vazamento em Massa' | 'Lote Fora Padrão' | 'Data Ilegível' | 'Fermentação' | 'Mofo' | 'Pallet Estrutural' | 'Outro';
+  qualityIssueType: 'Próximo da Validade' | 'Corpo Estranho' | 'Vazamento em Massa' | 'Lote Fora Padrão' | 'Data Ilegível' | 'Fermentação' | 'Mofo' | 'Pallet Estrutural' | 'Outro';
   requestedBy: string;     // Conferente / Operador
   requestDate: string;     // YYYY-MM-DD HH:mm
   fiscalBlockStatus: 'PENDENTE' | 'EFETIVADO' | 'TRATADO' | 'DESCARTADO' | 'DEVOLVIDO';

@@ -26,6 +26,7 @@ import {
 import { PNCRecord, PullRecord, ProductCatalogItem, UserAccount } from '../types';
 import { formatBRL, formatDateBR, formatHL, exportDataToExcel } from '../utils/nriCalculations';
 import { SupplierSearchCombobox } from './SupplierSearchCombobox';
+import { ProductSearchCombobox } from './ProductSearchCombobox';
 
 interface PNCViewProps {
   pncs: PNCRecord[];
@@ -90,6 +91,7 @@ export const PNCView: React.FC<PNCViewProps> = ({
       if (prefillPncModal.validityDate) setValidityDate(prefillPncModal.validityDate);
       if (prefillPncModal.requestedBy) setRequestedBy(prefillPncModal.requestedBy);
       if (prefillPncModal.reason) setReason(prefillPncModal.reason);
+      if (prefillPncModal.qualityIssueType) setQualityIssueType(prefillPncModal.qualityIssueType);
       setIsModalOpen(true);
     }
   }, [prefillPncModal]);
@@ -660,27 +662,30 @@ export const PNCView: React.FC<PNCViewProps> = ({
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1">Produto SKU:</label>
-                  <select
-                    value={productCode}
-                    onChange={(e) => setProductCode(e.target.value)}
-                    className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl text-xs font-bold truncate"
-                  >
-                    {catalog.map(c => (
-                      <option key={c.code} value={c.code}>
-                        {c.code} - {c.description}
-                      </option>
-                    ))}
-                  </select>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">Produto SKU (buscar por código ou nome):</label>
+                  <ProductSearchCombobox
+                    catalog={catalog}
+                    selectedProductCode={productCode}
+                    onSelectProduct={(prod) => setProductCode(prod.code)}
+                    theme="light"
+                    placeholder="Digite código SKU ou nome da cerveja/refri..."
+                  />
                 </div>
 
                 <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1">Tipo de Não Conformidade:</label>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">Tipo de Não Conformidade / Motivo:</label>
                   <select
                     value={qualityIssueType}
-                    onChange={(e) => setQualityIssueType(e.target.value as any)}
-                    className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl text-xs font-bold text-red-700"
+                    onChange={(e) => {
+                      const val = e.target.value as any;
+                      setQualityIssueType(val);
+                      if (val === 'Próximo da Validade' && !reason) {
+                        setReason('Produto recebido próximo da validade / lote crítico (Short Date).');
+                      }
+                    }}
+                    className="w-full px-3 py-2 bg-slate-50 border-2 border-slate-300 focus:border-red-500 rounded-xl text-xs font-bold text-red-700 focus:outline-none focus:ring-2 focus:ring-red-500/20"
                   >
+                    <option value="Próximo da Validade">Próximo da Validade (Short Date / Vencimento)</option>
                     <option value="Corpo Estranho">Corpo Estranho no Produto</option>
                     <option value="Vazamento em Massa">Vazamento em Massa / Ruptura</option>
                     <option value="Lote Fora Padrão">Lote Fora do Padrão Ambev</option>
