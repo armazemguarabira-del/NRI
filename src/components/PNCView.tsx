@@ -57,7 +57,7 @@ export const PNCView: React.FC<PNCViewProps> = ({
   // Form Fields
   const [nfeNumber, setNfeNumber] = useState('');
   const [truckPlate, setTruckPlate] = useState('');
-  const [factoryOrigin, setFactoryOrigin] = useState('F. Itapissuma');
+  const [factoryOrigin, setFactoryOrigin] = useState('950 - ITAPISSUMA');
   const [productCode, setProductCode] = useState(catalog[0]?.code || '34608');
   const [lotNumber, setLotNumber] = useState('');
   const [validityDate, setValidityDate] = useState('');

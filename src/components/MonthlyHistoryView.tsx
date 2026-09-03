@@ -17,25 +17,32 @@ import {
   Edit3,
   AlertCircle
 } from 'lucide-react';
-import { PullRecord, PullFilterState, NRIItem } from '../types';
+import { PullRecord, PullFilterState, NRIItem, SupplierItem } from '../types';
 import { formatDateBR, formatBRL, getAbcBadgeColor } from '../utils/nriCalculations';
 import { PauBrasilLogo } from './PauBrasilLogo';
+import { INITIAL_SUPPLIERS } from '../data/initialSuppliers';
 
 interface MonthlyHistoryViewProps {
   pulls: PullRecord[];
+  suppliers?: SupplierItem[];
   onSelectPullForLabels: (pull: PullRecord) => void;
   onSelectPullForSheet: (pull: PullRecord) => void;
   onDeletePull: (pullId: string) => void;
   onEditPull?: (pull: PullRecord) => void;
+  onUpdatePull?: (pull: PullRecord) => void;
 }
 
 export const MonthlyHistoryView: React.FC<MonthlyHistoryViewProps> = ({
   pulls,
+  suppliers = [],
   onSelectPullForLabels,
   onSelectPullForSheet,
   onDeletePull,
-  onEditPull
+  onEditPull,
+  onUpdatePull
 }) => {
+  const allSuppliers = (suppliers && suppliers.length > 0) ? suppliers : INITIAL_SUPPLIERS;
+  const [editingFactoryPullId, setEditingFactoryPullId] = useState<string | null>(null);
   // Filters State
   const [filters, setFilters] = useState<PullFilterState>({
     search: '',
@@ -436,9 +443,64 @@ export const MonthlyHistoryView: React.FC<MonthlyHistoryViewProps> = ({
                         <span className="text-xs px-2 py-0.5 bg-slate-200 font-mono font-bold rounded text-slate-700 uppercase">
                           {pull.header.truckPlate}
                         </span>
-                        <span className="text-xs px-2.5 py-0.5 bg-amber-100 font-bold rounded-full text-amber-900">
-                          {pull.header.factoryOrigin}
-                        </span>
+                        {editingFactoryPullId === pull.header.id ? (
+                          <div className="flex items-center gap-1">
+                            <select
+                              autoFocus
+                              value={pull.header.factoryOrigin || '950 - ITAPISSUMA'}
+                              onChange={(e) => {
+                                const newOrigin = e.target.value;
+                                if (onUpdatePull) {
+                                  onUpdatePull({
+                                    ...pull,
+                                    header: {
+                                      ...pull.header,
+                                      factoryOrigin: newOrigin
+                                    }
+                                  });
+                                }
+                                setEditingFactoryPullId(null);
+                              }}
+                              onBlur={() => setEditingFactoryPullId(null)}
+                              className="text-xs font-black bg-amber-50 text-amber-950 px-2 py-0.5 rounded-lg border-2 border-amber-500 focus:outline-none shadow-xs cursor-pointer"
+                            >
+                              <optgroup label="Fábricas Principais">
+                                <option value="950 - ITAPISSUMA">950 - ITAPISSUMA</option>
+                                <option value="426 - CDR JOÃO PESSOA">426 - CDR JOÃO PESSOA</option>
+                                <option value="3006 - SERGIPE">3006 - SERGIPE</option>
+                                <option value="436 - AQUIRAZ">436 - AQUIRAZ</option>
+                                <option value="421 - CAMAÇARI">421 - CAMAÇARI</option>
+                              </optgroup>
+                              <optgroup label="Demais Fornecedores">
+                                {allSuppliers
+                                  .filter(s => !['950', '426', '3006', '436', '421'].includes(String(s.code).trim()))
+                                  .map(s => (
+                                    <option key={s.id} value={`${s.code} - ${s.name}`}>
+                                      {s.code} - {s.name}
+                                    </option>
+                                  ))}
+                              </optgroup>
+                            </select>
+                            <button
+                              type="button"
+                              onClick={() => setEditingFactoryPullId(null)}
+                              className="text-[10px] text-slate-500 hover:text-slate-800 font-bold px-1"
+                            >
+                              ✕
+                            </button>
+                          </div>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => setEditingFactoryPullId(pull.header.id)}
+                            title="Clique para alterar a fábrica de origem desta puxada"
+                            className="text-xs px-2.5 py-0.5 bg-amber-100 hover:bg-amber-200 border border-amber-300 font-bold rounded-full text-amber-950 flex items-center gap-1 transition-all cursor-pointer group/fac"
+                          >
+                            <Building className="w-3 h-3 text-amber-700" />
+                            <span>{pull.header.factoryOrigin || '950 - ITAPISSUMA'}</span>
+                            <Edit3 className="w-2.5 h-2.5 text-amber-600 opacity-60 group-hover/fac:opacity-100" />
+                          </button>
+                        )}
                         {pull.hasValidityAlert && (
                           <span className="text-[10px] px-2 py-0.5 bg-red-100 border border-red-300 text-red-700 font-bold rounded-full flex items-center gap-1">
                             <AlertTriangle className="w-3 h-3" />

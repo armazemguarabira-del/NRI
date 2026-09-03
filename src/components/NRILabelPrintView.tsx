@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Printer, ArrowLeft, Layers, Filter, CheckCircle2, Image as ImageIcon, LayoutGrid, ExternalLink } from 'lucide-react';
-import { PullRecord, NRIItem, ProductCatalogItem } from '../types';
+import { Printer, ArrowLeft, Layers, Filter, CheckCircle2, Image as ImageIcon, LayoutGrid, ExternalLink, Building2 } from 'lucide-react';
+import { PullRecord, NRIItem, ProductCatalogItem, SupplierItem } from '../types';
 import { formatDateBR, getAbcBadgeColor, subtractDaysFromDate } from '../utils/nriCalculations';
 import { PauBrasilLogo } from './PauBrasilLogo';
 import { getStoredBrandSettings, BrandSettings } from '../utils/branding';
@@ -8,13 +8,17 @@ import { BrandingModal } from './BrandingModal';
 import { INITIAL_PRODUCTS } from '../data/initialCatalog';
 import { executePrintJob } from '../utils/printHelper';
 
+import { INITIAL_SUPPLIERS } from '../data/initialSuppliers';
+
 interface NRILabelPrintViewProps {
   currentPull?: PullRecord | null;
   pull?: PullRecord | null;
   catalog?: ProductCatalogItem[];
+  suppliers?: SupplierItem[];
   onBackToForm?: () => void;
   onBack?: () => void;
   onOpenBrandingModal?: () => void;
+  onUpdatePull?: (updatedPull: PullRecord) => void;
 }
 
 interface PrintablePalletFace {
@@ -42,9 +46,11 @@ export const NRILabelPrintView: React.FC<NRILabelPrintViewProps> = ({
   currentPull: propCurrentPull,
   pull: propPull,
   catalog,
+  suppliers = [],
   onBackToForm,
   onBack,
-  onOpenBrandingModal
+  onOpenBrandingModal,
+  onUpdatePull
 }) => {
   const currentPull = propPull !== undefined ? propPull : propCurrentPull;
   const handleBack = onBack || onBackToForm;
@@ -53,6 +59,8 @@ export const NRILabelPrintView: React.FC<NRILabelPrintViewProps> = ({
   const [facesPerPallet, setFacesPerPallet] = useState<number>(4); // 4 faces per pallet (Frente, Verso, Dir, Esq) = 1 folha A4 por pallet
   const [printSize, setPrintSize] = useState<'a4_4_per_page' | 'a4_double' | 'a4_single' | 'thermal'>('a4_4_per_page'); // 4 labels per A4 sheet (1x4 vertical)
   const [showLocalBrandingModal, setShowLocalBrandingModal] = useState(false);
+
+  const allSuppliers = (suppliers && suppliers.length > 0) ? suppliers : INITIAL_SUPPLIERS;
 
   const [brand, setBrand] = useState<BrandSettings>(getStoredBrandSettings);
 
@@ -262,6 +270,42 @@ export const NRILabelPrintView: React.FC<NRILabelPrintViewProps> = ({
             <ImageIcon className="w-3.5 h-3.5 text-amber-600" />
             <span>Upload Logo / Marca</span>
           </button>
+
+          {/* Quick Factory Origin Switcher */}
+          <div className="flex items-center gap-1.5 text-xs">
+            <span className="font-bold text-slate-600 flex items-center gap-1">
+              <Building2 className="w-3.5 h-3.5 text-amber-600" />
+              <span>Fábrica:</span>
+            </span>
+            <select
+              value={currentPull.header.factoryOrigin || '950 - ITAPISSUMA'}
+              onChange={(e) => {
+                const newFac = e.target.value;
+                if (onUpdatePull && currentPull) {
+                  onUpdatePull({
+                    ...currentPull,
+                    header: {
+                      ...currentPull.header,
+                      factoryOrigin: newFac
+                    }
+                  });
+                }
+              }}
+              className="bg-amber-50 border-2 border-amber-400 font-black text-slate-900 rounded-xl px-2.5 py-1.5 text-xs focus:ring-2 focus:ring-amber-500 shadow-2xs cursor-pointer max-w-[170px] truncate"
+              title="Alterar fábrica de origem para as etiquetas"
+            >
+              {[
+                '950 - ITAPISSUMA',
+                '426 - CDR JOÃO PESSOA',
+                '3006 - SERGIPE',
+                '436 - AQUIRAZ',
+                '421 - CAMAÇARI',
+                ...allSuppliers.map(s => `${s.code} - ${s.name}`)
+              ].filter((val, idx, self) => self.indexOf(val) === idx).map(facName => (
+                <option key={facName} value={facName}>{facName}</option>
+              ))}
+            </select>
+          </div>
 
           {/* Product Filter */}
           <div className="flex items-center gap-1.5 text-xs">
@@ -533,9 +577,9 @@ const LabelCard: React.FC<LabelCardProps> = ({ entry, currentPull, brand, varian
           <div className={`font-black text-black font-mono truncate leading-tight ${isCompact ? 'text-[8.5px]' : 'text-xs'}`}>{currentPull.header.nfeNumber}</div>
         </div>
 
-        <div className="p-0.5 px-0.5 flex flex-col justify-center overflow-hidden" title={currentPull.header.factoryOrigin || 'F. Itapissuma'}>
+        <div className="p-0.5 px-0.5 flex flex-col justify-center overflow-hidden" title={currentPull.header.factoryOrigin || '950 - ITAPISSUMA'}>
           <div className={`font-black uppercase text-slate-800 leading-none mb-0.5 ${isCompact ? 'text-[6.5px]' : 'text-[10px]'}`}>ORIGEM</div>
-          <div className={`font-black text-black truncate leading-tight ${isCompact ? 'text-[8px]' : 'text-xs'}`}>{currentPull.header.factoryOrigin || 'F. Itapissuma'}</div>
+          <div className={`font-black text-black truncate leading-tight ${isCompact ? 'text-[8px]' : 'text-xs'}`}>{currentPull.header.factoryOrigin || '950 - ITAPISSUMA'}</div>
         </div>
 
         <div className="p-0.5 flex flex-col justify-center overflow-hidden">

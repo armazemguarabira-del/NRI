@@ -91,7 +91,7 @@ export const NRICreationForm: React.FC<NRICreationFormProps> = ({
 
   const getEmptyHeader = (): NRIPullHeader => {
     const todayStr = new Date().toISOString().split('T')[0];
-    const defaultFactory = availableSuppliers[0] ? `${availableSuppliers[0].code} - ${availableSuppliers[0].name}` : '950 - ITAPISSUMA';
+    const defaultFactory = '950 - ITAPISSUMA';
     return {
       id: `pull-${Date.now()}`,
       nfeNumber: '',
@@ -116,7 +116,11 @@ export const NRICreationForm: React.FC<NRICreationFormProps> = ({
 
   // Header State (without Entrada Promax, Pallets PBRI and Chapatex inputs)
   const [header, setHeader] = useState<NRIPullHeader>(() => {
-    if (initialPull) return { ...initialPull.header };
+    if (initialPull) {
+      const orig = initialPull.header.factoryOrigin;
+      const normalizedOrigin = (!orig || orig === 'F. Itapissuma') ? '950 - ITAPISSUMA' : orig;
+      return { ...initialPull.header, factoryOrigin: normalizedOrigin };
+    }
     return getEmptyHeader();
   });
 
@@ -129,7 +133,9 @@ export const NRICreationForm: React.FC<NRICreationFormProps> = ({
   // Keep state synchronized with initialPull when editing is triggered or cancelled
   useEffect(() => {
     if (initialPull) {
-      setHeader({ ...initialPull.header });
+      const orig = initialPull.header.factoryOrigin;
+      const normalizedOrigin = (!orig || orig === 'F. Itapissuma') ? '950 - ITAPISSUMA' : orig;
+      setHeader({ ...initialPull.header, factoryOrigin: normalizedOrigin });
       setItems([...initialPull.items]);
     } else {
       setHeader(getEmptyHeader());

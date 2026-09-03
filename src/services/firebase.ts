@@ -81,7 +81,11 @@ export function subscribeToPulls(onUpdate: (pulls: PullRecord[]) => void) {
   return onSnapshot(pullsRef, async (snapshot) => {
     const list: PullRecord[] = [];
     snapshot.forEach((docSnap) => {
-      list.push(docSnap.data() as PullRecord);
+      const p = docSnap.data() as PullRecord;
+      if (p.header && (!p.header.factoryOrigin || p.header.factoryOrigin === 'F. Itapissuma')) {
+        p.header.factoryOrigin = '950 - ITAPISSUMA';
+      }
+      list.push(p);
     });
     // Sort descending by createdAt or receiptDate
     list.sort((a, b) => (b.header.createdAt || b.header.receiptDate || '').localeCompare(a.header.createdAt || a.header.receiptDate || ''));
@@ -536,7 +540,17 @@ export function subscribeToSuppliers(onUpdate: (suppliers: SupplierItem[]) => vo
       list.push(docSnap.data() as SupplierItem);
     });
 
-    list.sort((a, b) => a.name.localeCompare(b.name));
+    const MAIN_CODES = ['950', '426', '3006', '436', '421'];
+    list.sort((a, b) => {
+      const aCode = String(a.code).trim();
+      const bCode = String(b.code).trim();
+      const aIdx = MAIN_CODES.indexOf(aCode);
+      const bIdx = MAIN_CODES.indexOf(bCode);
+      if (aIdx !== -1 && bIdx !== -1) return aIdx - bIdx;
+      if (aIdx !== -1) return -1;
+      if (bIdx !== -1) return 1;
+      return a.name.localeCompare(b.name);
+    });
     if (list.length > 0) {
       setCachedData(CACHE_KEYS.SUPPLIERS, list);
     }

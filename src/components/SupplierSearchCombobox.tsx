@@ -28,10 +28,17 @@ export const SupplierSearchCombobox: React.FC<SupplierSearchComboboxProps> = ({
   required = false
 }) => {
   const [isOpen, setIsOpen] = useState(false);
-  const [searchTerm, setSearchTerm] = useState('');
+  const [searchTerm, setSearchTerm] = useState(value || '');
   const [highlightedIndex, setHighlightedIndex] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+
+  // Keep internal text in sync with external value prop
+  useEffect(() => {
+    if (!isOpen) {
+      setSearchTerm(value || '');
+    }
+  }, [value, isOpen]);
 
   const availableSuppliers = useMemo(() => {
     return (suppliers && suppliers.length > 0) ? suppliers : INITIAL_SUPPLIERS;
@@ -86,16 +93,32 @@ export const SupplierSearchCombobox: React.FC<SupplierSearchComboboxProps> = ({
     });
   }, [availableSuppliers, mainFactories, otherSuppliers, searchTerm]);
 
-  // Click outside to close
+  // Click outside to close and resolve value
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
         setIsOpen(false);
+        if (searchTerm.trim()) {
+          // If exact match or close match exists, format it
+          const term = searchTerm.toLowerCase().trim();
+          const match = availableSuppliers.find(s => 
+            s.code.toLowerCase() === term || 
+            s.name.toLowerCase() === term ||
+            `${s.code} - ${s.name}`.toLowerCase() === term
+          );
+          if (match) {
+            const formatted = `${match.code} - ${match.name}`;
+            onChange(formatted);
+            setSearchTerm(formatted);
+          } else {
+            onChange(searchTerm.trim());
+          }
+        }
       }
     };
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
+  }, [searchTerm, availableSuppliers, onChange]);
 
   // Reset highlight index when filtering
   useEffect(() => {
@@ -105,14 +128,14 @@ export const SupplierSearchCombobox: React.FC<SupplierSearchComboboxProps> = ({
   const handleSelect = (supplier: SupplierItem) => {
     const formatted = `${supplier.code} - ${supplier.name}`;
     onChange(formatted);
-    setSearchTerm('');
+    setSearchTerm(formatted);
     setIsOpen(false);
     inputRef.current?.blur();
   };
 
   const handleDirectSelect = (formattedText: string) => {
     onChange(formattedText);
-    setSearchTerm('');
+    setSearchTerm(formattedText);
     setIsOpen(false);
     inputRef.current?.blur();
   };
@@ -137,8 +160,17 @@ export const SupplierSearchCombobox: React.FC<SupplierSearchComboboxProps> = ({
       if (isOpen && filteredList[highlightedIndex]) {
         handleSelect(filteredList[highlightedIndex]);
       } else if (isOpen && searchTerm.trim()) {
-        // Allow custom value on Enter
-        handleDirectSelect(searchTerm.trim());
+        const term = searchTerm.toLowerCase().trim();
+        const match = availableSuppliers.find(s => 
+          s.code.toLowerCase() === term || 
+          s.name.toLowerCase() === term ||
+          `${s.code} - ${s.name}`.toLowerCase() === term
+        );
+        if (match) {
+          handleSelect(match);
+        } else {
+          handleDirectSelect(searchTerm.trim());
+        }
       } else if (!isOpen) {
         setIsOpen(true);
       }
@@ -167,7 +199,8 @@ export const SupplierSearchCombobox: React.FC<SupplierSearchComboboxProps> = ({
           }}
           onFocus={() => {
             setIsOpen(true);
-            setSearchTerm('');
+            setSearchTerm(value || '');
+            inputRef.current?.select();
           }}
           onKeyDown={handleKeyDown}
           placeholder={placeholder}
@@ -286,6 +319,10 @@ export const SupplierSearchCombobox: React.FC<SupplierSearchComboboxProps> = ({
                     return (
                       <div
                         key={fac.id}
+                        onMouseDown={(e) => {
+                          e.preventDefault();
+                          handleSelect(fac);
+                        }}
                         onClick={() => handleSelect(fac)}
                         className={`px-3 py-2 cursor-pointer flex items-center justify-between transition-colors ${
                           isSelected
@@ -325,6 +362,10 @@ export const SupplierSearchCombobox: React.FC<SupplierSearchComboboxProps> = ({
                     return (
                       <div
                         key={fac.id}
+                        onMouseDown={(e) => {
+                          e.preventDefault();
+                          handleSelect(fac);
+                        }}
                         onClick={() => handleSelect(fac)}
                         className={`px-3 py-2 cursor-pointer flex items-center justify-between transition-colors ${
                           isSelected
@@ -366,6 +407,10 @@ export const SupplierSearchCombobox: React.FC<SupplierSearchComboboxProps> = ({
                     return (
                       <div
                         key={fac.id}
+                        onMouseDown={(e) => {
+                          e.preventDefault();
+                          handleSelect(fac);
+                        }}
                         onClick={() => handleSelect(fac)}
                         className={`px-3 py-2 cursor-pointer flex items-center justify-between transition-colors ${
                           isSelected

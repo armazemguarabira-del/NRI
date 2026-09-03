@@ -313,6 +313,24 @@ export default function App() {
     setActiveTab('new_pull');
   };
 
+  const handleUpdatePull = async (updatedPull: PullRecord) => {
+    // 1. Immediately update local state
+    setPulls(prev => prev.map(p => p.header.id === updatedPull.header.id ? updatedPull : p));
+    if (selectedPull?.header.id === updatedPull.header.id) {
+      setSelectedPull(updatedPull);
+    }
+    if (editingPull?.header.id === updatedPull.header.id) {
+      setEditingPull(updatedPull);
+    }
+
+    // 2. Persist directly to Firebase Firestore
+    try {
+      await savePullToFirestore(updatedPull);
+    } catch (e) {
+      console.error('Error updating pull in Firestore:', e);
+    }
+  };
+
   const handleDeletePull = async (pullId: string) => {
     // 1. Immediately remove from React state so UI updates instantly
     setPulls(prev => prev.filter(p => p.header.id !== pullId));
@@ -582,10 +600,12 @@ export default function App() {
           {activeTab === 'history' && (
             <MonthlyHistoryView 
               pulls={pulls}
+              suppliers={suppliers}
               onSelectPullForLabels={handleSelectPullForLabels}
               onSelectPullForSheet={handleSelectPullForSheet}
               onDeletePull={handleDeletePull}
               onEditPull={handleEditPull}
+              onUpdatePull={handleUpdatePull}
             />
           )}
 
@@ -686,8 +706,10 @@ export default function App() {
             <NRILabelPrintView 
               pull={selectedPull}
               catalog={catalog}
+              suppliers={suppliers}
               onBack={() => setActiveTab('history')}
               onOpenBrandingModal={() => setIsBrandingModalOpen(true)}
+              onUpdatePull={handleUpdatePull}
             />
           )}
 
