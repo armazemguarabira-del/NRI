@@ -111,6 +111,42 @@
         "primaryLogoUrl": { "type": "string" },
         "secondaryLogoUrl": { "type": "string" }
       }
+    },
+    "LabelPrintEvent": {
+      "title": "LabelPrintEvent",
+      "description": "Registro de impressão física de etiquetas NRI em tempo real",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "pullId": { "type": "string" },
+        "nfeNumber": { "type": "string" },
+        "truckPlate": { "type": "string" },
+        "factoryOrigin": { "type": "string" },
+        "receiverName": { "type": "string" },
+        "printedAt": { "type": "string" },
+        "facesPerPallet": { "type": "number" },
+        "printFormat": { "type": "string" },
+        "totalPallets": { "type": "number" },
+        "totalLabelsCount": { "type": "number" },
+        "printedProductsSummary": { "type": "string" },
+        "printType": { "type": "string" },
+        "userFullName": { "type": "string" }
+      }
+    },
+    "ActivityLogEvent": {
+      "title": "ActivityLogEvent",
+      "description": "Log de evolução operacional e auditoria em tempo real",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "timestamp": { "type": "string" },
+        "category": { "type": "string" },
+        "severity": { "type": "string" },
+        "title": { "type": "string" },
+        "description": { "type": "string" },
+        "userName": { "type": "string" },
+        "referenceId": { "type": "string" }
+      }
     }
   },
   "firestore": {
@@ -145,6 +181,14 @@
     "/nri_branding_settings/{docId}": {
       "schema": { "$ref": "BrandSettings" },
       "description": "Configurações de identidade visual"
+    },
+    "/nri_label_prints/{printId}": {
+      "schema": { "$ref": "LabelPrintEvent" },
+      "description": "Coleção de auditoria de impressões de etiquetas em tempo real"
+    },
+    "/nri_activity_logs/{activityId}": {
+      "schema": { "$ref": "ActivityLogEvent" },
+      "description": "Coleção de auditoria e monitoramento de evoluções em tempo real"
     }
   }
 }

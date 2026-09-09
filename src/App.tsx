@@ -15,8 +15,10 @@ import { DatabaseView } from './components/DatabaseView';
 import { BrandingModal } from './components/BrandingModal';
 import { LoginView } from './components/LoginView';
 import { UserManagementView } from './components/UserManagementView';
+import { LabelDesignerCustomizerView } from './components/LabelDesignerCustomizerView';
+import { RealTimeMonitorView } from './components/RealTimeMonitorView';
 
-import { PullRecord, ProductCatalogItem, Report030519Item, BlitzRecord, PNCRecord, UserAccount, SupplierItem } from './types';
+import { PullRecord, ProductCatalogItem, Report030519Item, BlitzRecord, PNCRecord, UserAccount, SupplierItem, LabelPrintEvent, ActivityLogEvent } from './types';
 import { INITIAL_PRODUCTS } from './data/initialCatalog';
 import { INITIAL_SUPPLIERS } from './data/initialSuppliers';
 import { 
@@ -28,6 +30,8 @@ import {
   subscribeToUsers,
   subscribeToSuppliers,
   subscribeToBrandSettings,
+  subscribeToLabelPrints,
+  subscribeToActivityLogs,
   savePullToFirestore,
   deletePullFromFirestore,
   saveBlitzToFirestore,
@@ -53,13 +57,17 @@ import { saveStoredBrandSettings } from './utils/branding';
 import { Image as ImageIcon, AlertTriangle, Zap, ShieldAlert, Sparkles, Database, Cloud, Wifi } from 'lucide-react';
 
 export default function App() {
-  // Authentication & Current User Session
+  // Authentication & Current User Session - Starts immediately with default user
   const [currentUser, setCurrentUser] = useState<UserAccount | null>(() => {
     try {
       const saved = localStorage.getItem('nri_active_user');
-      return saved ? JSON.parse(saved) : null;
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (parsed && parsed.username) return parsed;
+      }
+      return DEFAULT_USERS[0];
     } catch {
-      return null;
+      return DEFAULT_USERS[0];
     }
   });
 
@@ -99,6 +107,8 @@ export default function App() {
   const [reportItems, setReportItems] = useState<Report030519Item[]>(() => getCachedData(CACHE_KEYS.REPORT_030519, []));
   const [blitzRecords, setBlitzRecords] = useState<BlitzRecord[]>(() => getCachedData(CACHE_KEYS.BLITZ, []));
   const [pncRecords, setPncRecords] = useState<PNCRecord[]>(() => getCachedData(CACHE_KEYS.PNCS, []));
+  const [labelPrints, setLabelPrints] = useState<LabelPrintEvent[]>(() => getCachedData(CACHE_KEYS.LABEL_PRINTS, []));
+  const [activityLogs, setActivityLogs] = useState<ActivityLogEvent[]>(() => getCachedData(CACHE_KEYS.ACTIVITY_LOGS, []));
   const [isDbConnected, setIsDbConnected] = useState<boolean>(true);
 
   // Real-time Firestore Subscriptions
@@ -161,6 +171,14 @@ export default function App() {
       }
     });
 
+    const unsubPrints = subscribeToLabelPrints((updatedPrints) => {
+      setLabelPrints(updatedPrints);
+    });
+
+    const unsubLogs = subscribeToActivityLogs((updatedLogs) => {
+      setActivityLogs(updatedLogs);
+    });
+
     return () => {
       unsubPulls();
       unsubBlitz();
@@ -170,6 +188,8 @@ export default function App() {
       unsubUsers();
       unsubSuppliers();
       unsubBrand();
+      unsubPrints();
+      unsubLogs();
     };
   }, []);
 
@@ -505,6 +525,7 @@ export default function App() {
         totalPullsCount={pulls.length}
         blitzCount={blitzRecords.length}
         pncCount={pncRecords.length}
+        labelPrintCount={labelPrints.length}
         onOpenBrandingModal={() => setIsBrandingModalOpen(true)}
         isCollapsed={isSidebarCollapsed}
         setIsCollapsed={setIsSidebarCollapsed}
@@ -701,6 +722,20 @@ export default function App() {
             />
           )}
 
+          {/* MONITORAMENTO EM TEMPO REAL & AUDITORIA DE ETIQUETAS */}
+          {activeTab === 'realtime_monitor' && (
+            <RealTimeMonitorView 
+              labelPrints={labelPrints}
+              activityLogs={activityLogs}
+              pulls={pulls}
+              blitzRecords={blitzRecords}
+              pncRecords={pncRecords}
+              isDbConnected={isDbConnected}
+              onNavigateToTab={setActiveTab}
+              onSelectPullForLabels={handleSelectPullForLabels}
+            />
+          )}
+
           {/* ETIQUETAS DE PALLETS */}
           {activeTab === 'print_labels' && (
             <NRILabelPrintView 
@@ -710,6 +745,16 @@ export default function App() {
               onBack={() => setActiveTab('history')}
               onOpenBrandingModal={() => setIsBrandingModalOpen(true)}
               onUpdatePull={handleUpdatePull}
+              onNavigateToDesigner={() => setActiveTab('label_designer')}
+            />
+          )}
+
+          {/* DESIGNER & PERSONALIZAÇÃO MANUAL DE ETIQUETAS */}
+          {activeTab === 'label_designer' && (
+            <LabelDesignerCustomizerView 
+              pulls={pulls}
+              catalog={catalog}
+              onNavigateToPrint={() => setActiveTab('print_labels')}
             />
           )}
 

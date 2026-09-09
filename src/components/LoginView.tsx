@@ -131,10 +131,66 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLogin, users }) => {
             type="submit"
             className="w-full mt-2 py-3.5 px-4 bg-amber-500 hover:bg-amber-600 active:scale-[0.98] text-slate-950 rounded-xl text-sm font-black transition-all shadow-md flex items-center justify-center gap-2 uppercase tracking-wide cursor-pointer"
           >
-            <span>Entrar</span>
+            <span>Entrar na Plataforma</span>
             <ArrowRight className="w-4 h-4" />
           </button>
         </form>
+
+        {/* ACESSO RÁPIDO OPERACIONAL */}
+        <div className="w-full mt-6 pt-6 border-t border-slate-100">
+          <p className="text-[11px] font-black uppercase text-slate-400 tracking-wider text-center mb-3">
+            Acesso Rápido com 1 Clique
+          </p>
+          <div className="grid grid-cols-1 gap-2">
+            <button
+              type="button"
+              onClick={() => {
+                const adminUser = users.find(u => u.username === 'admin') || {
+                  id: 'user-admin',
+                  username: 'admin',
+                  password: '123',
+                  fullName: 'Administrador NRI',
+                  role: 'ADMINISTRADOR',
+                  unit: 'GUARABIRA - PB',
+                  createdAt: '2026-01-01',
+                  active: true
+                };
+                onLogin(adminUser);
+              }}
+              className="w-full py-2.5 px-3 bg-slate-50 hover:bg-amber-50 hover:border-amber-300 border border-slate-200 rounded-xl text-xs font-bold text-slate-800 transition-all flex items-center justify-between cursor-pointer"
+            >
+              <div className="flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-amber-500"></span>
+                <span>Entrar como Administrador</span>
+              </div>
+              <span className="text-[10px] text-amber-700 bg-amber-100 font-black px-2 py-0.5 rounded-full">admin</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => {
+                const gilsonUser = users.find(u => u.username === 'gilson') || {
+                  id: 'user-gilson',
+                  username: 'gilson',
+                  password: '123',
+                  fullName: 'Gilson Conferente',
+                  role: 'CONFERENTE',
+                  unit: 'GUARABIRA - PB',
+                  createdAt: '2026-01-01',
+                  active: true
+                };
+                onLogin(gilsonUser);
+              }}
+              className="w-full py-2 px-3 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-xl text-xs font-bold text-slate-700 transition-all flex items-center justify-between cursor-pointer"
+            >
+              <div className="flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-blue-500"></span>
+                <span>Gilson (Conferente)</span>
+              </div>
+              <span className="text-[10px] text-slate-500 bg-slate-200 font-bold px-2 py-0.5 rounded-full">gilson</span>
+            </button>
+          </div>
+        </div>
 
       </div>
     </div>

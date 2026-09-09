@@ -223,3 +223,42 @@ export interface PullFilterState {
   receiver: string;
 }
 
+// ==========================================
+// REAL-TIME AUDIT & LABEL PRINT MONITORING
+// ==========================================
+export type PrintEventType = 'PRIMEIRA_EMISSAO' | 'REIMPRESSAO' | 'REIMPRESSAO_PARCIAL' | 'TESTE_DESIGNER';
+
+export interface LabelPrintEvent {
+  id: string;
+  pullId?: string;
+  nfeNumber: string;
+  truckPlate: string;
+  factoryOrigin: string;
+  receiverName: string;
+  printedAt: string; // ISO string
+  facesPerPallet: number; // 1, 2, 4
+  printFormat: 'a4_4_per_page' | 'a4_double' | 'a4_single' | 'thermal';
+  totalPallets: number;
+  totalLabelsCount: number;
+  printedProductsSummary: string;
+  printType: PrintEventType;
+  userFullName?: string;
+  notes?: string;
+}
+
+export type ActivityCategory = 'ETIQUETAS' | 'PUXADA' | 'AVARIA' | 'BLOQUEIO' | 'SISTEMA' | 'CONFIGURACAO';
+export type ActivitySeverity = 'info' | 'success' | 'warning' | 'critical';
+
+export interface ActivityLogEvent {
+  id: string;
+  timestamp: string; // ISO string
+  category: ActivityCategory;
+  severity: ActivitySeverity;
+  title: string;
+  description: string;
+  userName: string;
+  userRole?: string;
+  referenceId?: string; // pullId, nfeNumber, etc.
+  metadata?: Record<string, any>;
+}
+

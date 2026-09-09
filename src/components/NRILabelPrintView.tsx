@@ -1,13 +1,15 @@
 import React, { useState, useEffect } from 'react';
-import { Printer, ArrowLeft, Layers, Filter, CheckCircle2, Image as ImageIcon, LayoutGrid, ExternalLink, Building2 } from 'lucide-react';
-import { PullRecord, NRIItem, ProductCatalogItem, SupplierItem } from '../types';
+import { Printer, ArrowLeft, Layers, Filter, CheckCircle2, Image as ImageIcon, LayoutGrid, ExternalLink, Building2, SlidersHorizontal, Cloud } from 'lucide-react';
+import { PullRecord, NRIItem, ProductCatalogItem, SupplierItem, LabelPrintEvent } from '../types';
 import { formatDateBR, getAbcBadgeColor, subtractDaysFromDate } from '../utils/nriCalculations';
 import { PauBrasilLogo } from './PauBrasilLogo';
 import { getStoredBrandSettings, BrandSettings } from '../utils/branding';
+import { getStoredLabelConfig, LabelCustomConfig } from '../utils/labelConfig';
+import { NRILabelCard } from './NRILabelCard';
 import { BrandingModal } from './BrandingModal';
 import { INITIAL_PRODUCTS } from '../data/initialCatalog';
 import { executePrintJob } from '../utils/printHelper';
-
+import { logLabelPrintToFirestore } from '../services/firebase';
 import { INITIAL_SUPPLIERS } from '../data/initialSuppliers';
 
 interface NRILabelPrintViewProps {
@@ -19,6 +21,7 @@ interface NRILabelPrintViewProps {
   onBack?: () => void;
   onOpenBrandingModal?: () => void;
   onUpdatePull?: (updatedPull: PullRecord) => void;
+  onNavigateToDesigner?: () => void;
 }
 
 interface PrintablePalletFace {
@@ -50,7 +53,8 @@ export const NRILabelPrintView: React.FC<NRILabelPrintViewProps> = ({
   onBackToForm,
   onBack,
   onOpenBrandingModal,
-  onUpdatePull
+  onUpdatePull,
+  onNavigateToDesigner
 }) => {
   const currentPull = propPull !== undefined ? propPull : propCurrentPull;
   const handleBack = onBack || onBackToForm;
@@ -63,11 +67,18 @@ export const NRILabelPrintView: React.FC<NRILabelPrintViewProps> = ({
   const allSuppliers = (suppliers && suppliers.length > 0) ? suppliers : INITIAL_SUPPLIERS;
 
   const [brand, setBrand] = useState<BrandSettings>(getStoredBrandSettings);
+  const [labelConfig, setLabelConfig] = useState<LabelCustomConfig>(getStoredLabelConfig);
 
   useEffect(() => {
     const handleUpdate = () => setBrand(getStoredBrandSettings());
     window.addEventListener('brand_settings_updated', handleUpdate);
     return () => window.removeEventListener('brand_settings_updated', handleUpdate);
+  }, []);
+
+  useEffect(() => {
+    const handleConfigUpdate = () => setLabelConfig(getStoredLabelConfig());
+    window.addEventListener('label_custom_settings_updated', handleConfigUpdate);
+    return () => window.removeEventListener('label_custom_settings_updated', handleConfigUpdate);
   }, []);
 
   const triggerBrandingModal = onOpenBrandingModal || (() => setShowLocalBrandingModal(true));
@@ -202,7 +213,43 @@ export const NRILabelPrintView: React.FC<NRILabelPrintViewProps> = ({
     pagedSheets.push(printableList.slice(i, i + itemsPerSheet));
   }
 
+  const [lastPrintedAt, setLastPrintedAt] = useState<string | null>(null);
+
   const handlePrint = () => {
+    // 1. Log print event to Firestore & Local Cache immediately for real-time monitoring
+    try {
+      const summary = currentPull.items
+        .slice(0, 5)
+        .map(it => `${it.productCode} (${it.quantitySku}cx)`)
+        .join(', ') + (currentPull.items.length > 5 ? ` +${currentPull.items.length - 5} SKUs` : '');
+
+      const printEvent: LabelPrintEvent = {
+        id: `print-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+        pullId: currentPull.header.id,
+        nfeNumber: currentPull.header.nfeNumber || 'S/N',
+        truckPlate: currentPull.header.truckPlate || 'S/P',
+        factoryOrigin: currentPull.header.factoryOrigin || 'Ambev',
+        receiverName: currentPull.header.receiverName || 'Conferente',
+        printedAt: new Date().toISOString(),
+        facesPerPallet: 4,
+        printFormat: printSize,
+        totalPallets: Math.max(1, Math.round(currentPull.totalPallets || 1)),
+        totalLabelsCount: printableList.length,
+        printedProductsSummary: summary,
+        printType: lastPrintedAt ? 'REIMPRESSAO' : 'PRIMEIRA_EMISSAO',
+        userFullName: currentPull.header.receiverName || 'Operador',
+        notes: `Impresso em formato ${printSize === 'a4_4_per_page' ? 'A4 4 por folha' : printSize}`
+      };
+
+      logLabelPrintToFirestore(printEvent).catch(err => {
+        console.warn('Erro ao registrar auditoria de impressão no Firestore:', err);
+      });
+      setLastPrintedAt(new Date().toLocaleTimeString('pt-BR'));
+    } catch (logErr) {
+      console.warn('Falha no log da impressão:', logErr);
+    }
+
+    // 2. Trigger physical print
     try {
       executePrintJob('printable-sheets-container', `Etiquetas_${currentPull.header.truckPlate || 'NRI'}_${currentPull.header.nfeNumber || 'Doc'}`);
     } catch (err) {
@@ -261,6 +308,18 @@ export const NRILabelPrintView: React.FC<NRILabelPrintViewProps> = ({
         {/* Filters and Print buttons */}
         <div className="flex flex-wrap items-center gap-2.5">
           
+          {onNavigateToDesigner && (
+            <button
+              type="button"
+              onClick={onNavigateToDesigner}
+              className="flex items-center gap-1.5 px-3.5 py-2 bg-purple-50 hover:bg-purple-100 text-purple-900 font-black rounded-xl text-xs transition-colors border border-purple-200 cursor-pointer shadow-2xs"
+              title="Ajustar espessura das bordas, tamanho das fontes e colunas da etiqueta"
+            >
+              <SlidersHorizontal className="w-3.5 h-3.5 text-purple-700" />
+              <span>Personalizar Bordas & Fontes</span>
+            </button>
+          )}
+
           <button
             type="button"
             onClick={triggerBrandingModal}
@@ -350,6 +409,13 @@ export const NRILabelPrintView: React.FC<NRILabelPrintViewProps> = ({
             <Printer className="w-4 h-4 stroke-[2.5]" />
             <span>Imprimir {printableList.length} Etiqueta(s) ({pagedSheets.length} Folha(s))</span>
           </button>
+
+          {lastPrintedAt && (
+            <div className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-50 text-emerald-900 border border-emerald-300 rounded-xl text-xs font-bold animate-fadeIn">
+              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+              <span>Sincronizado na Nuvem às {lastPrintedAt}</span>
+            </div>
+          )}
         </div>
       </div>
 
@@ -370,11 +436,12 @@ export const NRILabelPrintView: React.FC<NRILabelPrintViewProps> = ({
             }
           >
             {sheet.map((entry, entryIdx) => (
-              <LabelCard
+              <NRILabelCard
                 key={`${entry.item.id}-p${entry.palletNumber}-f${entry.faceNumber}-${sheetIdx}-${entryIdx}`}
                 entry={entry}
                 currentPull={currentPull}
                 brand={brand}
+                labelConfig={labelConfig}
                 variant={printSize}
               />
             ))}

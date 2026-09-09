@@ -29,7 +29,8 @@ import {
   FileSpreadsheet,
   Database,
   Key,
-  Users
+  Users,
+  Radio
 } from 'lucide-react';
 import { PauBrasilLogo } from './PauBrasilLogo';
 import { getStoredBrandSettings, BrandSettings } from '../utils/branding';
@@ -45,7 +46,9 @@ export type NavTabType =
   | 'catalog' 
   | 'users'
   | 'database'
+  | 'realtime_monitor'
   | 'print_labels' 
+  | 'label_designer'
   | 'conference_sheet';
 
 interface SidebarProps {
@@ -55,6 +58,7 @@ interface SidebarProps {
   totalPullsCount: number;
   blitzCount?: number;
   pncCount?: number;
+  labelPrintCount?: number;
   onOpenBrandingModal: () => void;
   isCollapsed: boolean;
   setIsCollapsed: (collapsed: boolean | ((prev: boolean) => boolean)) => void;
@@ -81,6 +85,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   totalPullsCount,
   blitzCount = 0,
   pncCount = 0,
+  labelPrintCount = 0,
   onOpenBrandingModal,
   isCollapsed,
   setIsCollapsed,
@@ -200,12 +205,32 @@ export const Sidebar: React.FC<SidebarProps> = ({
       iconColor: 'text-white',
     },
     {
+      id: 'realtime_monitor',
+      title: 'MONITOR TEMPO REAL',
+      subtitle: 'Evoluções & Impressão Etiquetas',
+      icon: Radio,
+      iconBg: 'bg-emerald-600',
+      iconColor: 'text-white',
+      badge: labelPrintCount > 0 ? `${labelPrintCount}` : 'AO VIVO',
+      badgeColor: 'bg-emerald-500 text-slate-950 font-black text-[10px] px-2 py-0.5 rounded-full animate-pulse'
+    },
+    {
       id: 'print_labels',
       title: 'ETIQUETAS PALLET',
       subtitle: 'Impressão 4 Faces por Pallet',
       icon: Printer,
       iconBg: 'bg-indigo-600',
       iconColor: 'text-white',
+    },
+    {
+      id: 'label_designer',
+      title: 'DESIGNER ETIQUETAS',
+      subtitle: 'Ajuste Manual Bordas & Fontes',
+      icon: SlidersHorizontal,
+      iconBg: 'bg-purple-600',
+      iconColor: 'text-white',
+      badge: 'NOVO',
+      badgeColor: 'bg-purple-500 text-white font-extrabold text-[9px] px-1.5 py-0.2 rounded-full'
     },
     {
       id: 'conference_sheet',

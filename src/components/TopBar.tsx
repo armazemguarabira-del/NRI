@@ -14,7 +14,8 @@ import {
   Zap, 
   ShieldAlert,
   Cloud,
-  Wifi
+  Wifi,
+  Radio
 } from 'lucide-react';
 import { PauBrasilLogo } from './PauBrasilLogo';
 import { getStoredBrandSettings, BrandSettings } from '../utils/branding';
@@ -70,9 +71,17 @@ const TAB_TITLES: Record<NavTabType, { title: string; subtitle: string }> = {
     title: 'GESTÃO DA BASE DE DADOS & RESET',
     subtitle: 'Exportação completa em CSV e JSON estruturado, métricas de prejuízo financeiro e hectolitros e limpeza geral'
   },
+  realtime_monitor: {
+    title: 'MONITORAMENTO EM TEMPO REAL & AUDITORIA DE ETIQUETAS',
+    subtitle: 'Acompanhamento ao vivo de todas as impressões de etiquetas NRI, evoluções de puxadas e prevenção total de perdas'
+  },
   print_labels: {
     title: 'CENTRAL DE IMPRESSÃO DE ETIQUETAS NRI',
     subtitle: 'Identificação padrão Ambev de 4 faces por pallet com curva ABC colorida e datas em destaque'
+  },
+  label_designer: {
+    title: 'DESIGNER & PERSONALIZAÇÃO MANUAL DE ETIQUETAS NRI',
+    subtitle: 'Ajuste fino de espessura de bordas, tipografia, colunas da tabela e elementos visuais das etiquetas impressas'
   },
   conference_sheet: {
     title: 'ESPELHO OFICIAL DE CONFERÊNCIA DA CARRETA',
@@ -133,11 +142,16 @@ export const TopBar: React.FC<TopBarProps> = ({
         {/* Right: Operational Status & Branding Button */}
         <div className="flex items-center gap-2.5">
           {/* Cloud Database Connected Status Badge */}
-          <div className="hidden sm:flex items-center gap-1.5 px-2.5 py-1 bg-emerald-50 border border-emerald-300 rounded-xl text-[11px] font-black text-emerald-800" title="Banco de dados Firebase Firestore conectado em tempo real">
+          <button
+            type="button"
+            onClick={() => onNavigate('realtime_monitor')}
+            className="flex items-center gap-1.5 px-2.5 py-1 bg-emerald-50 hover:bg-emerald-100 border border-emerald-300 rounded-xl text-[11px] font-black text-emerald-800 transition-colors cursor-pointer"
+            title="Clique para abrir a Central de Monitoramento em Tempo Real"
+          >
             <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping"></span>
-            <Cloud className="w-3.5 h-3.5 text-emerald-600" />
-            <span>Firebase Online</span>
-          </div>
+            <Radio className="w-3.5 h-3.5 text-emerald-600" />
+            <span className="hidden sm:inline">Tempo Real Ativo</span>
+          </button>
 
           {/* Alert Badge -> Direct link to 'alerts' */}
           {alertCount > 0 && (

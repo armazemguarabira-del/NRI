@@ -8,10 +8,21 @@ import {
   getDocs, 
   onSnapshot, 
   deleteDoc, 
-  writeBatch 
+  writeBatch,
+  getDocFromServer
 } from 'firebase/firestore';
 import firebaseConfig from '../../firebase-applet-config.json';
-import { PullRecord, BlitzRecord, PNCRecord, Report030519Item, ProductCatalogItem, UserAccount, SupplierItem } from '../types';
+import { 
+  PullRecord, 
+  BlitzRecord, 
+  PNCRecord, 
+  Report030519Item, 
+  ProductCatalogItem, 
+  UserAccount, 
+  SupplierItem,
+  LabelPrintEvent,
+  ActivityLogEvent
+} from '../types';
 import { INITIAL_SUPPLIERS } from '../data/initialSuppliers';
 
 // Initialize Firebase App instance safely (singleton pattern)
@@ -19,6 +30,21 @@ const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
 
 // Direct binding to the dedicated Firestore Database ID from configuration
 export const db = getFirestore(app, firebaseConfig.firestoreDatabaseId || undefined);
+
+// Validate connection on boot as mandated by Firebase skill
+export async function testConnection(): Promise<boolean> {
+  try {
+    await getDocFromServer(doc(db, 'test', 'connection'));
+    return true;
+  } catch (error) {
+    if (error instanceof Error && error.message.includes('the client is offline')) {
+      console.warn('Aviso: Cliente offline ou conectando ao Firestore...');
+      return false;
+    }
+    return true;
+  }
+}
+testConnection();
 
 // Collection Names in Firestore
 export const COLLECTIONS = {
@@ -29,7 +55,9 @@ export const COLLECTIONS = {
   CATALOG: 'nri_product_catalog',
   BRANDING: 'nri_branding_settings',
   USERS: 'nri_users',
-  SUPPLIERS: 'nri_suppliers'
+  SUPPLIERS: 'nri_suppliers',
+  LABEL_PRINTS: 'nri_label_prints',
+  ACTIVITY_LOGS: 'nri_activity_logs'
 } as const;
 
 // LocalStorage Cache Keys
@@ -40,7 +68,9 @@ export const CACHE_KEYS = {
   REPORT_030519: 'nri_cached_report030519',
   CATALOG: 'nri_cached_catalog',
   USERS: 'nri_cached_users',
-  SUPPLIERS: 'nri_cached_suppliers'
+  SUPPLIERS: 'nri_cached_suppliers',
+  LABEL_PRINTS: 'nri_cached_label_prints',
+  ACTIVITY_LOGS: 'nri_cached_activity_logs'
 } as const;
 
 // Cache Helper Functions
@@ -263,8 +293,9 @@ export async function savePullToFirestore(pull: PullRecord): Promise<void> {
   // Update local cache immediately
   const existing = getCachedData<PullRecord[]>(CACHE_KEYS.PULLS, []);
   const idx = existing.findIndex(p => p.header.id === pull.header.id);
-  const updated = idx >= 0 ? [...existing] : [pull, ...existing];
-  if (idx >= 0) updated[idx] = pull;
+  const isNew = idx < 0;
+  const updated = isNew ? [pull, ...existing] : [...existing];
+  if (!isNew) updated[idx] = pull;
   setCachedData(CACHE_KEYS.PULLS, updated);
 
   try {
@@ -273,11 +304,29 @@ export async function savePullToFirestore(pull: PullRecord): Promise<void> {
   } catch (err) {
     console.error('Error writing pull to Firestore (saved locally in cache):', err);
   }
+
+  // Real-time evolution log
+  logActivityToFirestore({
+    category: 'PUXADA',
+    severity: pull.hasValidityAlert ? 'warning' : 'success',
+    title: isNew ? 'Nova Puxada Registrada' : 'Puxada Atualizada',
+    description: `${isNew ? 'Criada' : 'Modificada'} entrada da carreta ${pull.header.truckPlate} (NF ${pull.header.nfeNumber}) com ${pull.totalPallets} pallets por ${pull.header.receiverName || 'Operador'}`,
+    userName: pull.header.receiverName || 'Operador',
+    referenceId: pull.header.id,
+    metadata: {
+      truckPlate: pull.header.truckPlate,
+      nfeNumber: pull.header.nfeNumber,
+      totalPallets: pull.totalPallets,
+      factoryOrigin: pull.header.factoryOrigin,
+      isNew
+    }
+  }).catch(() => {});
 }
 
 export async function deletePullFromFirestore(pullId: string): Promise<void> {
   // Update local cache
   const existing = getCachedData<PullRecord[]>(CACHE_KEYS.PULLS, []);
+  const target = existing.find(p => p.header.id === pullId);
   const filtered = existing.filter(p => p.header.id !== pullId);
   setCachedData(CACHE_KEYS.PULLS, filtered);
 
@@ -287,6 +336,15 @@ export async function deletePullFromFirestore(pullId: string): Promise<void> {
   } catch (err) {
     console.error('Error deleting pull from Firestore:', err);
   }
+
+  logActivityToFirestore({
+    category: 'PUXADA',
+    severity: 'warning',
+    title: 'Puxada Excluída',
+    description: `Puxada NF ${target?.header.nfeNumber || pullId} - Placa ${target?.header.truckPlate || ''} foi removida do sistema`,
+    userName: 'Administrador/Operador',
+    referenceId: pullId
+  }).catch(() => {});
 }
 
 export async function saveBlitzToFirestore(record: BlitzRecord): Promise<void> {
@@ -302,6 +360,15 @@ export async function saveBlitzToFirestore(record: BlitzRecord): Promise<void> {
   } catch (err) {
     console.error('Error writing Blitz to Firestore:', err);
   }
+
+  logActivityToFirestore({
+    category: 'AVARIA',
+    severity: 'warning',
+    title: 'Registro de Blitz de Puxada',
+    description: `Avaria reportada: ${record.blockedQty} un bloqueadas (${record.damageType}) em ${record.productDescription} - NF ${record.nfeNumber}`,
+    userName: record.conferente || 'Conferente',
+    referenceId: record.id
+  }).catch(() => {});
 }
 
 export async function deleteBlitzFromFirestore(id: string): Promise<void> {
@@ -329,6 +396,15 @@ export async function savePNCToFirestore(record: PNCRecord): Promise<void> {
   } catch (err) {
     console.error('Error writing PNC to Firestore:', err);
   }
+
+  logActivityToFirestore({
+    category: 'BLOQUEIO',
+    severity: 'critical',
+    title: 'Abertura de PNC / Bloqueio Fiscal',
+    description: `PNC ${record.pncNumber} aberto para NF ${record.nfeNumber} (${record.quantityBlocked} un de ${record.productDescription}): ${record.reason}`,
+    userName: 'Qualidade / Conferência',
+    referenceId: record.id
+  }).catch(() => {});
 }
 
 export async function deletePNCFromFirestore(id: string): Promise<void> {
@@ -356,6 +432,14 @@ export async function saveReport030519ToFirestore(items: Report030519Item[]): Pr
   } catch (err) {
     console.error('Error writing Report030519 to Firestore:', err);
   }
+
+  logActivityToFirestore({
+    category: 'SISTEMA',
+    severity: 'info',
+    title: 'Relatório 03.05.19 Atualizado',
+    description: `Sincronização de ${items.length} SKUs com curva ABC de movimentação e giro diário`,
+    userName: 'Sistema / Planejamento'
+  }).catch(() => {});
 }
 
 export async function saveCatalogItemToFirestore(item: ProductCatalogItem): Promise<void> {
@@ -627,6 +711,177 @@ export async function saveBrandSettingsToFirestore(brandSettings: any): Promise<
     await setDoc(brandingRef, brandSettings, { merge: true });
   } catch (err) {
     console.error('Error writing branding to Firestore:', err);
+  }
+}
+
+// ==========================================
+// LABEL CUSTOM CONFIG FIRESTORE INTEGRATION
+// ==========================================
+export function subscribeToLabelConfig(onUpdate: (config: any) => void) {
+  const labelConfigRef = doc(db, COLLECTIONS.BRANDING, 'label_custom_layout');
+  return onSnapshot(labelConfigRef, (docSnap) => {
+    if (docSnap.exists()) {
+      const data = docSnap.data();
+      onUpdate(data);
+    }
+  }, (error) => {
+    console.warn('Error listening to label config in Firestore:', error);
+  });
+}
+
+export async function saveLabelConfigToFirestore(config: any): Promise<void> {
+  try {
+    const labelConfigRef = doc(db, COLLECTIONS.BRANDING, 'label_custom_layout');
+    await setDoc(labelConfigRef, config, { merge: true });
+  } catch (err) {
+    console.error('Error writing label config to Firestore:', err);
+  }
+}
+
+// ==========================================
+// LABEL PRINT MONITORING FIRESTORE INTEGRATION
+// ==========================================
+export function subscribeToLabelPrints(onUpdate: (prints: LabelPrintEvent[]) => void) {
+  const cached = getCachedData<LabelPrintEvent[]>(CACHE_KEYS.LABEL_PRINTS, []);
+  if (cached && cached.length > 0) {
+    onUpdate(cached);
+  }
+
+  const printsRef = collection(db, COLLECTIONS.LABEL_PRINTS);
+  return onSnapshot(printsRef, (snapshot) => {
+    const list: LabelPrintEvent[] = [];
+    snapshot.forEach((docSnap) => {
+      list.push(docSnap.data() as LabelPrintEvent);
+    });
+    // Sort descending by printedAt
+    list.sort((a, b) => (b.printedAt || '').localeCompare(a.printedAt || ''));
+    setCachedData(CACHE_KEYS.LABEL_PRINTS, list);
+    onUpdate(list);
+  }, (error) => {
+    console.error('Error listening to label prints in Firestore, using cache fallback:', error);
+    onUpdate(getCachedData<LabelPrintEvent[]>(CACHE_KEYS.LABEL_PRINTS, []));
+  });
+}
+
+export async function logLabelPrintToFirestore(event: LabelPrintEvent): Promise<void> {
+  // Update local cache immediately to prevent loss
+  const existing = getCachedData<LabelPrintEvent[]>(CACHE_KEYS.LABEL_PRINTS, []);
+  const updated = [event, ...existing.filter(e => e.id !== event.id)].slice(0, 500); // keep last 500
+  setCachedData(CACHE_KEYS.LABEL_PRINTS, updated);
+
+  try {
+    const printRef = doc(db, COLLECTIONS.LABEL_PRINTS, event.id);
+    await setDoc(printRef, event, { merge: true });
+  } catch (err) {
+    console.error('Error logging label print to Firestore:', err);
+  }
+
+  // Also automatically register an activity event for real-time monitoring
+  logActivityToFirestore({
+    category: 'ETIQUETAS',
+    severity: event.printType === 'PRIMEIRA_EMISSAO' ? 'success' : 'info',
+    title: `Etiquetas Impressas (${event.totalLabelsCount} un)`,
+    description: `${event.userFullName || event.receiverName} imprimiu ${event.totalLabelsCount} etiquetas (${event.facesPerPallet} faces/pal) para NF ${event.nfeNumber} - Placa ${event.truckPlate}`,
+    userName: event.userFullName || event.receiverName || 'Operador',
+    referenceId: event.pullId || event.nfeNumber,
+    metadata: {
+      truckPlate: event.truckPlate,
+      nfeNumber: event.nfeNumber,
+      totalPallets: event.totalPallets,
+      printFormat: event.printFormat,
+      printType: event.printType
+    }
+  }).catch(() => {});
+}
+
+export async function deleteLabelPrintFromFirestore(printId: string): Promise<void> {
+  const existing = getCachedData<LabelPrintEvent[]>(CACHE_KEYS.LABEL_PRINTS, []);
+  setCachedData(CACHE_KEYS.LABEL_PRINTS, existing.filter(e => e.id !== printId));
+
+  try {
+    const printRef = doc(db, COLLECTIONS.LABEL_PRINTS, printId);
+    await deleteDoc(printRef);
+  } catch (err) {
+    console.error('Error deleting label print from Firestore:', err);
+  }
+}
+
+export async function clearLabelPrintsInFirestore(): Promise<void> {
+  setCachedData(CACHE_KEYS.LABEL_PRINTS, []);
+  try {
+    const colRef = collection(db, COLLECTIONS.LABEL_PRINTS);
+    const snapshot = await getDocs(colRef);
+    const batch = writeBatch(db);
+    snapshot.forEach(d => batch.delete(d.ref));
+    await batch.commit();
+  } catch (err) {
+    console.error('Error clearing label prints in Firestore:', err);
+  }
+}
+
+// ==========================================
+// REAL-TIME AUDIT & EVOLUTION LOGS INTEGRATION
+// ==========================================
+export function subscribeToActivityLogs(onUpdate: (logs: ActivityLogEvent[]) => void) {
+  const cached = getCachedData<ActivityLogEvent[]>(CACHE_KEYS.ACTIVITY_LOGS, []);
+  if (cached && cached.length > 0) {
+    onUpdate(cached);
+  }
+
+  const logsRef = collection(db, COLLECTIONS.ACTIVITY_LOGS);
+  return onSnapshot(logsRef, (snapshot) => {
+    const list: ActivityLogEvent[] = [];
+    snapshot.forEach((docSnap) => {
+      list.push(docSnap.data() as ActivityLogEvent);
+    });
+    list.sort((a, b) => (b.timestamp || '').localeCompare(a.timestamp || ''));
+    setCachedData(CACHE_KEYS.ACTIVITY_LOGS, list);
+    onUpdate(list);
+  }, (error) => {
+    console.error('Error listening to activity logs in Firestore, using cache fallback:', error);
+    onUpdate(getCachedData<ActivityLogEvent[]>(CACHE_KEYS.ACTIVITY_LOGS, []));
+  });
+}
+
+export async function logActivityToFirestore(
+  event: Omit<ActivityLogEvent, 'id' | 'timestamp'> & { id?: string; timestamp?: string }
+): Promise<void> {
+  const fullEvent: ActivityLogEvent = {
+    id: event.id || `act-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
+    timestamp: event.timestamp || new Date().toISOString(),
+    category: event.category,
+    severity: event.severity,
+    title: event.title,
+    description: event.description,
+    userName: event.userName,
+    userRole: event.userRole || 'OPERADOR',
+    referenceId: event.referenceId || '',
+    metadata: event.metadata || {}
+  };
+
+  // Immediate local cache write
+  const existing = getCachedData<ActivityLogEvent[]>(CACHE_KEYS.ACTIVITY_LOGS, []);
+  const updated = [fullEvent, ...existing.filter(e => e.id !== fullEvent.id)].slice(0, 300);
+  setCachedData(CACHE_KEYS.ACTIVITY_LOGS, updated);
+
+  try {
+    const ref = doc(db, COLLECTIONS.ACTIVITY_LOGS, fullEvent.id);
+    await setDoc(ref, fullEvent, { merge: true });
+  } catch (err) {
+    console.error('Error logging activity to Firestore:', err);
+  }
+}
+
+export async function clearActivityLogsInFirestore(): Promise<void> {
+  setCachedData(CACHE_KEYS.ACTIVITY_LOGS, []);
+  try {
+    const colRef = collection(db, COLLECTIONS.ACTIVITY_LOGS);
+    const snapshot = await getDocs(colRef);
+    const batch = writeBatch(db);
+    snapshot.forEach(d => batch.delete(d.ref));
+    await batch.commit();
+  } catch (err) {
+    console.error('Error clearing activity logs in Firestore:', err);
   }
 }
 
