@@ -15,9 +15,10 @@ import {
   TrendingDown,
   Layers,
   Edit3,
-  AlertCircle
+  AlertCircle,
+  Clock
 } from 'lucide-react';
-import { PullRecord, PullFilterState, NRIItem, SupplierItem } from '../types';
+import { PullRecord, PullFilterState, NRIItem, SupplierItem, LabelPrintEvent } from '../types';
 import { formatDateBR, formatBRL, getAbcBadgeColor } from '../utils/nriCalculations';
 import { PauBrasilLogo } from './PauBrasilLogo';
 import { INITIAL_SUPPLIERS } from '../data/initialSuppliers';
@@ -25,6 +26,7 @@ import { INITIAL_SUPPLIERS } from '../data/initialSuppliers';
 interface MonthlyHistoryViewProps {
   pulls: PullRecord[];
   suppliers?: SupplierItem[];
+  labelPrints?: LabelPrintEvent[];
   onSelectPullForLabels: (pull: PullRecord) => void;
   onSelectPullForSheet: (pull: PullRecord) => void;
   onDeletePull: (pullId: string) => void;
@@ -35,6 +37,7 @@ interface MonthlyHistoryViewProps {
 export const MonthlyHistoryView: React.FC<MonthlyHistoryViewProps> = ({
   pulls,
   suppliers = [],
+  labelPrints = [],
   onSelectPullForLabels,
   onSelectPullForSheet,
   onDeletePull,
@@ -43,6 +46,18 @@ export const MonthlyHistoryView: React.FC<MonthlyHistoryViewProps> = ({
 }) => {
   const allSuppliers = (suppliers && suppliers.length > 0) ? suppliers : INITIAL_SUPPLIERS;
   const [editingFactoryPullId, setEditingFactoryPullId] = useState<string | null>(null);
+  const [labelFilter, setLabelFilter] = useState<'ALL' | 'EMITIDA' | 'PENDENTE'>('ALL');
+
+  // Real-time lookup map of label print events by pullId and NFe
+  const printMap = useMemo(() => {
+    const map = new Map<string, LabelPrintEvent>();
+    labelPrints.forEach(lp => {
+      if (lp.pullId && !map.has(lp.pullId)) map.set(lp.pullId, lp);
+      if (lp.nfeNumber && !map.has(lp.nfeNumber)) map.set(lp.nfeNumber, lp);
+    });
+    return map;
+  }, [labelPrints]);
+
   // Filters State
   const [filters, setFilters] = useState<PullFilterState>({
     search: '',
@@ -113,14 +128,22 @@ export const MonthlyHistoryView: React.FC<MonthlyHistoryViewProps> = ({
       if (filters.abcClass !== 'ALL' && !pull.items.some(it => it.abcClass === filters.abcClass)) return false;
       if (filters.riskLevel !== 'ALL' && !pull.items.some(it => it.baseRisk === filters.riskLevel)) return false;
 
+      // Real-time Label Filter
+      if (labelFilter !== 'ALL') {
+        const printInfo = printMap.get(pull.header.id) || printMap.get(pull.header.nfeNumber);
+        const isPrinted = Boolean(pull.lastPrintedAt || (pull.printCount && pull.printCount > 0) || printInfo);
+        if (labelFilter === 'EMITIDA' && !isPrinted) return false;
+        if (labelFilter === 'PENDENTE' && isPrinted) return false;
+      }
+
       return true;
     });
-  }, [pulls, filters]);
+  }, [pulls, filters, labelFilter, printMap]);
 
   // Reset pagination on filter change
   useEffect(() => {
     setCurrentPage(1);
-  }, [filters, pageSize]);
+  }, [filters, labelFilter, pageSize]);
 
   const totalPages = Math.max(1, Math.ceil(filteredPulls.length / pageSize));
   const paginatedPulls = useMemo(() => {
@@ -136,6 +159,8 @@ export const MonthlyHistoryView: React.FC<MonthlyHistoryViewProps> = ({
     let totalH = 0;
     let totalV = 0;
     let totalAlerts = 0;
+    let pullsPrintedCount = 0;
+    let totalLabelsCount = 0;
 
     filteredPulls.forEach(p => {
       totalP += p.totalPallets;
@@ -143,6 +168,13 @@ export const MonthlyHistoryView: React.FC<MonthlyHistoryViewProps> = ({
       totalH += p.totalHectoliters;
       totalV += p.totalValue;
       totalAlerts += p.alertCount;
+
+      const printInfo = printMap.get(p.header.id) || printMap.get(p.header.nfeNumber);
+      const isPrinted = Boolean(p.lastPrintedAt || (p.printCount && p.printCount > 0) || printInfo);
+      if (isPrinted) {
+        pullsPrintedCount++;
+        totalLabelsCount += p.printedLabelsCount || printInfo?.totalLabelsCount || Math.round(p.totalPallets * 4);
+      }
     });
 
     return {
@@ -151,9 +183,12 @@ export const MonthlyHistoryView: React.FC<MonthlyHistoryViewProps> = ({
       totalSku: totalS,
       totalHectoliters: Number(totalH.toFixed(2)),
       totalValue: totalV,
-      totalAlerts
+      totalAlerts,
+      pullsPrintedCount,
+      totalLabelsCount,
+      pendingPullsCount: Math.max(0, filteredPulls.length - pullsPrintedCount)
     };
-  }, [filteredPulls]);
+  }, [filteredPulls, printMap]);
 
   // Export to CSV
   const handleExportCSV = () => {
@@ -290,6 +325,62 @@ export const MonthlyHistoryView: React.FC<MonthlyHistoryViewProps> = ({
             {summary.totalAlerts}
           </div>
           <div className="text-[10px] text-slate-500 mt-0.5">&lt; 3 meses (90 dias)</div>
+        </div>
+      </div>
+
+      {/* REAL-TIME LABEL EMISSION STATUS & FILTER BAR */}
+      <div className="bg-slate-900 text-white p-3.5 sm:p-4 rounded-2xl border border-slate-800 flex flex-wrap items-center justify-between gap-3 shadow-sm">
+        <div className="flex items-center gap-2.5">
+          <div className="w-8 h-8 rounded-xl bg-amber-500/20 border border-amber-400/30 flex items-center justify-center text-amber-400">
+            <Printer className="w-4 h-4" />
+          </div>
+          <div>
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-black uppercase tracking-wider text-slate-100">
+                Auditoria de Etiquetas NRI em Tempo Real
+              </span>
+              <span className="flex items-center gap-1 px-2 py-0.2 rounded-full text-[9px] font-black bg-emerald-500/20 border border-emerald-500/30 text-emerald-400">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                AO VIVO
+              </span>
+            </div>
+            <p className="text-[11px] text-slate-400">
+              <strong className="text-emerald-400 font-mono font-bold">{summary.pullsPrintedCount}</strong> de <strong className="text-slate-200 font-mono">{summary.pullsCount}</strong> carretas identificadas ({summary.totalLabelsCount} etiquetas emitidas no ato)
+            </p>
+          </div>
+        </div>
+
+        {/* Quick Filter Pill Buttons for Labels */}
+        <div className="flex items-center gap-1.5 bg-slate-800 p-1 rounded-xl border border-slate-700 text-xs">
+          <button
+            type="button"
+            onClick={() => setLabelFilter('ALL')}
+            className={`px-2.5 py-1 rounded-lg font-bold transition-all ${
+              labelFilter === 'ALL' ? 'bg-amber-500 text-slate-950 shadow-xs' : 'text-slate-400 hover:text-white'
+            }`}
+          >
+            Todas ({pulls.length})
+          </button>
+          <button
+            type="button"
+            onClick={() => setLabelFilter('EMITIDA')}
+            className={`px-2.5 py-1 rounded-lg font-bold transition-all flex items-center gap-1 ${
+              labelFilter === 'EMITIDA' ? 'bg-emerald-500 text-slate-950 shadow-xs' : 'text-slate-400 hover:text-white'
+            }`}
+          >
+            <CheckCircle2 className="w-3 h-3" />
+            <span>Emitidas ({summary.pullsPrintedCount})</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setLabelFilter('PENDENTE')}
+            className={`px-2.5 py-1 rounded-lg font-bold transition-all flex items-center gap-1 ${
+              labelFilter === 'PENDENTE' ? 'bg-amber-400 text-slate-950 shadow-xs' : 'text-slate-400 hover:text-white'
+            }`}
+          >
+            <Clock className="w-3 h-3" />
+            <span>Aguardando ({summary.pendingPullsCount})</span>
+          </button>
         </div>
       </div>
 
@@ -507,9 +598,27 @@ export const MonthlyHistoryView: React.FC<MonthlyHistoryViewProps> = ({
                             <span>{pull.alertCount} Alerta(s)</span>
                           </span>
                         )}
+
+                        {/* REAL-TIME LABEL STATUS BADGE */}
+                        {(() => {
+                          const printInfo = printMap.get(pull.header.id) || printMap.get(pull.header.nfeNumber);
+                          const isPrinted = Boolean(pull.lastPrintedAt || (pull.printCount && pull.printCount > 0) || printInfo);
+                          const printedCount = pull.printedLabelsCount || printInfo?.totalLabelsCount || (isPrinted ? Math.round(pull.totalPallets * 4) : 0);
+                          return isPrinted ? (
+                            <span className="text-[10px] px-2.5 py-0.5 bg-emerald-100 border border-emerald-300 text-emerald-800 font-black rounded-full flex items-center gap-1 shadow-2xs">
+                              <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+                              <span>ETIQUETAS EMITIDAS ({printedCount} un)</span>
+                            </span>
+                          ) : (
+                            <span className="text-[10px] px-2.5 py-0.5 bg-amber-50 border border-amber-300 text-amber-900 font-bold rounded-full flex items-center gap-1">
+                              <Clock className="w-3 h-3 text-amber-600" />
+                              <span>AGUARDANDO EMISSÃO</span>
+                            </span>
+                          );
+                        })()}
                       </div>
 
-                      <div className="text-xs text-slate-500 flex items-center gap-3 mt-1 font-sans">
+                      <div className="text-xs text-slate-500 flex flex-wrap items-center gap-2.5 mt-1 font-sans">
                         <span>Receb: <strong className="text-slate-700 font-mono">{formatDateBR(pull.header.receiptDate)} às {pull.header.receiptTime}</strong></span>
                         <span>•</span>
                         <span>Turno: <strong className="text-slate-700">{pull.header.shift}</strong></span>
@@ -521,6 +630,20 @@ export const MonthlyHistoryView: React.FC<MonthlyHistoryViewProps> = ({
                             <span>Promax: <strong className="font-mono text-slate-700">#{pull.header.promaxEntry}</strong></span>
                           </>
                         )}
+                        {(() => {
+                          const printInfo = printMap.get(pull.header.id) || printMap.get(pull.header.nfeNumber);
+                          const printTime = pull.lastPrintedAt || printInfo?.printedAt;
+                          if (!printTime) return null;
+                          return (
+                            <>
+                              <span>•</span>
+                              <span className="text-emerald-700 font-bold flex items-center gap-1 font-mono">
+                                <Printer className="w-3 h-3" />
+                                <span>Emitido: {new Date(printTime).toLocaleTimeString('pt-BR')} ({pull.printCount || 1}ª vez)</span>
+                              </span>
+                            </>
+                          );
+                        })()}
                       </div>
                     </div>
                   </div>
@@ -556,14 +679,24 @@ export const MonthlyHistoryView: React.FC<MonthlyHistoryViewProps> = ({
                       <span className="hidden md:inline">Espelho</span>
                     </button>
 
-                    <button
-                      onClick={() => onSelectPullForLabels(pull)}
-                      className="px-3 py-2 bg-amber-500 hover:bg-amber-600 text-slate-950 rounded-lg text-xs font-black transition-all shadow-xs flex items-center gap-1.5 active:scale-95"
-                      title="Imprimir Etiquetas de Pallet"
-                    >
-                      <Printer className="w-4 h-4" />
-                      <span>Etiquetas ({pull.totalPallets})</span>
-                    </button>
+                    {(() => {
+                      const printInfo = printMap.get(pull.header.id) || printMap.get(pull.header.nfeNumber);
+                      const isPrinted = Boolean(pull.lastPrintedAt || (pull.printCount && pull.printCount > 0) || printInfo);
+                      return (
+                        <button
+                          onClick={() => onSelectPullForLabels(pull)}
+                          className={`px-3 py-2 rounded-lg text-xs font-black transition-all shadow-xs flex items-center gap-1.5 active:scale-95 ${
+                            isPrinted 
+                              ? 'bg-emerald-500 hover:bg-emerald-600 text-slate-950' 
+                              : 'bg-amber-500 hover:bg-amber-600 text-slate-950'
+                          }`}
+                          title="Imprimir Etiquetas de Pallet"
+                        >
+                          <Printer className="w-4 h-4" />
+                          <span>{isPrinted ? `Reimprimir (${pull.totalPallets})` : `Etiquetas (${pull.totalPallets})`}</span>
+                        </button>
+                      );
+                    })()}
 
                     <button
                       onClick={() => setExpandedPullId(isExpanded ? null : pull.header.id)}

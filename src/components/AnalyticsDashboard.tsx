@@ -33,9 +33,12 @@ import {
   CheckCircle2,
   ExternalLink,
   Flame,
-  Award
+  Award,
+  Printer,
+  Radio,
+  Sparkles
 } from 'lucide-react';
-import { PullRecord, ProductCatalogItem, BlitzRecord, PNCRecord } from '../types';
+import { PullRecord, ProductCatalogItem, BlitzRecord, PNCRecord, LabelPrintEvent } from '../types';
 import { formatBRL, formatDateBR, getAbcBadgeColor } from '../utils/nriCalculations';
 import { PauBrasilLogo } from './PauBrasilLogo';
 
@@ -44,6 +47,8 @@ interface AnalyticsDashboardProps {
   catalog: ProductCatalogItem[];
   blitzRecords?: BlitzRecord[];
   pncRecords?: PNCRecord[];
+  labelPrints?: LabelPrintEvent[];
+  isDbConnected?: boolean;
   onSelectPullForLabels?: (pull: PullRecord) => void;
   onNavigateToTab?: (tabId: string) => void;
 }
@@ -53,6 +58,8 @@ export const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({
   catalog,
   blitzRecords = [],
   pncRecords = [],
+  labelPrints = [],
+  isDbConnected = true,
   onSelectPullForLabels,
   onNavigateToTab
 }) => {
@@ -126,6 +133,46 @@ export const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({
       return true;
     });
   }, [blitzRecords, selectedMonth, selectedFactory, selectedProduct]);
+
+  // Real-Time Label Emission Statistics (Updated in real-time on any print event)
+  const labelStats = useMemo(() => {
+    const totalPrints = labelPrints.length;
+    const totalLabelsCount = labelPrints.reduce((acc, p) => acc + (p.totalLabelsCount || 0), 0);
+
+    const printedNfes = new Set<string>();
+    const printedPullIds = new Set<string>();
+    labelPrints.forEach(p => {
+      if (p.pullId) printedPullIds.add(p.pullId);
+      if (p.nfeNumber) printedNfes.add(p.nfeNumber);
+    });
+
+    let pullsWithLabels = 0;
+    filteredPulls.forEach(p => {
+      if (
+        p.lastPrintedAt || 
+        (p.printCount && p.printCount > 0) || 
+        printedPullIds.has(p.header.id) || 
+        printedNfes.has(p.header.nfeNumber)
+      ) {
+        pullsWithLabels++;
+      }
+    });
+
+    const pendingPulls = Math.max(0, filteredPulls.length - pullsWithLabels);
+    const emissionPercentage = filteredPulls.length > 0 ? (pullsWithLabels / filteredPulls.length) * 100 : 0;
+    const recentPrints = [...labelPrints]
+      .sort((a, b) => (b.printedAt || '').localeCompare(a.printedAt || ''))
+      .slice(0, 5);
+
+    return {
+      totalPrints,
+      totalLabelsCount,
+      pullsWithLabels,
+      pendingPulls,
+      emissionPercentage,
+      recentPrints
+    };
+  }, [labelPrints, filteredPulls]);
 
   // Aggregate Metrics & Analytics
   const stats = useMemo(() => {
@@ -488,6 +535,133 @@ export const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({
           <div className="text-[10px] text-red-700 mt-0.5 font-bold">Clique para ver detalhes</div>
         </div>
 
+      </div>
+
+      {/* 3.1. REAL-TIME LABEL EMISSION TELEMETRY & AUDIT BANNER */}
+      <div className="bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 text-white p-5 rounded-2xl border border-slate-700 shadow-md space-y-4">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-700/80 pb-3">
+          <div className="flex items-center gap-2.5">
+            <div className="w-9 h-9 rounded-xl bg-amber-500/20 border border-amber-400/30 flex items-center justify-center text-amber-400">
+              <Printer className="w-5 h-5" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <h3 className="text-sm font-black uppercase tracking-wider text-slate-100 flex items-center gap-2">
+                  Emissão de Etiquetas NRI em Tempo Real
+                </h3>
+                <span className="flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-black bg-emerald-500/20 border border-emerald-500/40 text-emerald-400">
+                  <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                  SINCRONIZAÇÃO AO VIVO
+                </span>
+              </div>
+              <p className="text-[11px] text-slate-400">
+                Atualização instantânea via Firestore: cada etiqueta emitida por qualquer conferente é computada no ato.
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-3">
+            {onNavigateToTab && (
+              <button
+                type="button"
+                onClick={() => onNavigateToTab('realtime_monitor')}
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-700 hover:bg-slate-600 text-amber-400 text-xs font-bold rounded-xl transition-colors border border-slate-600"
+              >
+                <Radio className="w-3.5 h-3.5" />
+                <span>Central de Monitoramento &rarr;</span>
+              </button>
+            )}
+          </div>
+        </div>
+
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          <div className="bg-slate-800/80 p-3 rounded-xl border border-slate-700">
+            <span className="text-[10px] font-bold text-slate-400 uppercase block">Total de Etiquetas Emitidas</span>
+            <span className="text-2xl font-black text-amber-400 font-mono mt-0.5 block">
+              {labelStats.totalLabelsCount} <span className="text-xs font-normal text-slate-400">unid</span>
+            </span>
+            <span className="text-[10px] text-slate-400 block mt-0.5">
+              {labelStats.totalPrints} sessões de impressão
+            </span>
+          </div>
+
+          <div className="bg-slate-800/80 p-3 rounded-xl border border-slate-700">
+            <span className="text-[10px] font-bold text-slate-400 uppercase block">Puxadas com Etiqueta</span>
+            <span className="text-2xl font-black text-emerald-400 font-mono mt-0.5 block">
+              {labelStats.pullsWithLabels} <span className="text-xs font-normal text-slate-400">de {stats.totalPulls}</span>
+            </span>
+            <span className="text-[10px] text-emerald-300 block mt-0.5">
+              {labelStats.emissionPercentage.toFixed(0)}% das carretas identificadas
+            </span>
+          </div>
+
+          <div className="bg-slate-800/80 p-3 rounded-xl border border-slate-700">
+            <span className="text-[10px] font-bold text-slate-400 uppercase block">Aguardando Emissão</span>
+            <span className="text-2xl font-black text-slate-200 font-mono mt-0.5 block">
+              {labelStats.pendingPulls} <span className="text-xs font-normal text-slate-400">carretas</span>
+            </span>
+            <span className="text-[10px] text-slate-400 block mt-0.5">
+              {labelStats.pendingPulls === 0 ? '✓ 100% etiquetadas' : 'Pendentes de impressão no pátio'}
+            </span>
+          </div>
+
+          <div className="bg-slate-800/80 p-3 rounded-xl border border-slate-700">
+            <span className="text-[10px] font-bold text-slate-400 uppercase block">Padrão da Unidade</span>
+            <span className="text-base font-black text-slate-200 mt-1 block">
+              A4 4x Folha (1x4)
+            </span>
+            <span className="text-[10px] text-slate-400 block mt-0.5">
+              4 faces por pallet com QR Code
+            </span>
+          </div>
+        </div>
+
+        {/* FEED DE ÚLTIMAS EMISSÕES REGISTRADAS NO ATO */}
+        {labelStats.recentPrints.length > 0 && (
+          <div className="mt-3 pt-3 border-t border-slate-700/60">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-[11px] font-black uppercase tracking-wider text-slate-300 flex items-center gap-1.5">
+                <Sparkles className="w-3 h-3 text-amber-400" />
+                Últimas Emissões de Etiquetas Registradas no Ato:
+              </span>
+              <span className="text-[10px] text-slate-400 font-mono">
+                {labelStats.recentPrints.length} emissões recentes
+              </span>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
+              {labelStats.recentPrints.map(print => (
+                <div 
+                  key={print.id}
+                  className="bg-slate-800/90 hover:bg-slate-750 p-2.5 rounded-xl border border-slate-700 flex items-center justify-between gap-2 transition-all text-xs"
+                >
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2">
+                      <span className="font-mono font-black text-amber-400 truncate">
+                        {print.truckPlate || 'S/P'}
+                      </span>
+                      <span className="text-[10px] px-1.5 py-0.2 rounded bg-slate-700 text-slate-300 font-mono">
+                        NF {print.nfeNumber}
+                      </span>
+                    </div>
+                    <div className="text-[10px] text-slate-400 mt-0.5 truncate">
+                      {print.userFullName || print.receiverName || 'Conferente'} • {print.factoryOrigin || 'Fábrica'}
+                    </div>
+                  </div>
+
+                  <div className="text-right shrink-0">
+                    <div className="text-xs font-black text-emerald-400 font-mono">
+                      +{print.totalLabelsCount} etiq
+                    </div>
+                    <div className="text-[9px] text-slate-400 font-mono">
+                      {print.printedAt ? new Date(print.printedAt).toLocaleTimeString('pt-BR') : ''}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
 
       {/* 4. TOP 10 RANKINGS: TOP 10 FÁBRICAS COM MAIS AVARIAS & TOP 10 PALLETS AVARIADOS */}

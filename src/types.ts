@@ -131,6 +131,10 @@ export interface PullRecord {
   hasValidityAlert: boolean;
   alertCount: number;
   averageStockAgeIndex: number;
+  lastPrintedAt?: string;
+  printedLabelsCount?: number;
+  printCount?: number;
+  lastPrintedBy?: string;
 }
 
 export interface BlitzPalletRecord {

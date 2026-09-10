@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Printer, ArrowLeft, Layers, Filter, CheckCircle2, Image as ImageIcon, LayoutGrid, ExternalLink, Building2, SlidersHorizontal, Cloud } from 'lucide-react';
+import { Printer, ArrowLeft, Layers, Filter, CheckCircle2, Image as ImageIcon, LayoutGrid, ExternalLink, Building2, SlidersHorizontal, Cloud, Zap } from 'lucide-react';
 import { PullRecord, NRIItem, ProductCatalogItem, SupplierItem, LabelPrintEvent } from '../types';
 import { formatDateBR, getAbcBadgeColor, subtractDaysFromDate } from '../utils/nriCalculations';
 import { PauBrasilLogo } from './PauBrasilLogo';
@@ -9,7 +9,7 @@ import { NRILabelCard } from './NRILabelCard';
 import { BrandingModal } from './BrandingModal';
 import { INITIAL_PRODUCTS } from '../data/initialCatalog';
 import { executePrintJob } from '../utils/printHelper';
-import { logLabelPrintToFirestore } from '../services/firebase';
+import { logLabelPrintToFirestore, savePullToFirestore } from '../services/firebase';
 import { INITIAL_SUPPLIERS } from '../data/initialSuppliers';
 
 interface NRILabelPrintViewProps {
@@ -214,9 +214,29 @@ export const NRILabelPrintView: React.FC<NRILabelPrintViewProps> = ({
   }
 
   const [lastPrintedAt, setLastPrintedAt] = useState<string | null>(null);
+  const [printSuccessAlert, setPrintSuccessAlert] = useState<boolean>(false);
 
   const handlePrint = () => {
-    // 1. Log print event to Firestore & Local Cache immediately for real-time monitoring
+    const nowIso = new Date().toISOString();
+    const nowTime = new Date().toLocaleTimeString('pt-BR');
+
+    // 1. Immediately update pull record state & persist in Firestore
+    const updatedPull: PullRecord = {
+      ...currentPull,
+      lastPrintedAt: nowIso,
+      lastPrintedBy: currentPull.header.receiverName || 'Operador',
+      printedLabelsCount: (currentPull.printedLabelsCount || 0) + printableList.length,
+      printCount: (currentPull.printCount || 0) + 1
+    };
+
+    if (onUpdatePull) {
+      onUpdatePull(updatedPull);
+    }
+    savePullToFirestore(updatedPull).catch(err => {
+      console.warn('Erro ao atualizar status de impressão da puxada no Firestore:', err);
+    });
+
+    // 2. Log print event to Firestore & Local Cache immediately for real-time monitoring
     try {
       const summary = currentPull.items
         .slice(0, 5)
@@ -230,13 +250,13 @@ export const NRILabelPrintView: React.FC<NRILabelPrintViewProps> = ({
         truckPlate: currentPull.header.truckPlate || 'S/P',
         factoryOrigin: currentPull.header.factoryOrigin || 'Ambev',
         receiverName: currentPull.header.receiverName || 'Conferente',
-        printedAt: new Date().toISOString(),
+        printedAt: nowIso,
         facesPerPallet: 4,
         printFormat: printSize,
         totalPallets: Math.max(1, Math.round(currentPull.totalPallets || 1)),
         totalLabelsCount: printableList.length,
         printedProductsSummary: summary,
-        printType: lastPrintedAt ? 'REIMPRESSAO' : 'PRIMEIRA_EMISSAO',
+        printType: (currentPull.printCount || 0) > 0 || lastPrintedAt ? 'REIMPRESSAO' : 'PRIMEIRA_EMISSAO',
         userFullName: currentPull.header.receiverName || 'Operador',
         notes: `Impresso em formato ${printSize === 'a4_4_per_page' ? 'A4 4 por folha' : printSize}`
       };
@@ -244,12 +264,14 @@ export const NRILabelPrintView: React.FC<NRILabelPrintViewProps> = ({
       logLabelPrintToFirestore(printEvent).catch(err => {
         console.warn('Erro ao registrar auditoria de impressão no Firestore:', err);
       });
-      setLastPrintedAt(new Date().toLocaleTimeString('pt-BR'));
+      setLastPrintedAt(nowTime);
+      setPrintSuccessAlert(true);
+      setTimeout(() => setPrintSuccessAlert(false), 5000);
     } catch (logErr) {
       console.warn('Falha no log da impressão:', logErr);
     }
 
-    // 2. Trigger physical print
+    // 3. Trigger physical print
     try {
       executePrintJob('printable-sheets-container', `Etiquetas_${currentPull.header.truckPlate || 'NRI'}_${currentPull.header.nfeNumber || 'Doc'}`);
     } catch (err) {
@@ -274,6 +296,24 @@ export const NRILabelPrintView: React.FC<NRILabelPrintViewProps> = ({
   return (
     <div className="max-w-7xl mx-auto p-4 sm:p-6 space-y-6">
       
+      {/* REAL-TIME SYNC CONFIRMATION BANNER */}
+      {printSuccessAlert && (
+        <div className="print:hidden p-4 bg-emerald-500 text-slate-950 font-black text-xs rounded-2xl flex items-center justify-between shadow-lg animate-in fade-in slide-in-from-top-2">
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 rounded-xl bg-slate-950/15 flex items-center justify-center">
+              <CheckCircle2 className="w-5 h-5 text-slate-950" />
+            </div>
+            <div>
+              <p className="uppercase tracking-wide font-black">Emissão de Etiquetas Registrada com Sucesso!</p>
+              <p className="text-[11px] text-emerald-950 font-medium">As informações e auditoria foram sincronizadas em tempo real nos Dashboards e Históricos.</p>
+            </div>
+          </div>
+          <span className="text-[10px] bg-slate-950 text-white font-mono px-2.5 py-1 rounded-full uppercase tracking-wider">
+            Sincronizado via Firestore
+          </span>
+        </div>
+      )}
+
       {/* Top Controls Toolbar */}
       <div className="print:hidden bg-white p-5 rounded-3xl border border-slate-200 shadow-xs flex flex-wrap items-center justify-between gap-4">
         

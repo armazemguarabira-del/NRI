@@ -589,6 +589,8 @@ export default function App() {
               catalog={catalog}
               blitzRecords={blitzRecords}
               pncRecords={pncRecords}
+              labelPrints={labelPrints}
+              isDbConnected={isDbConnected}
               onSelectPullForLabels={handleSelectPullForLabels}
               onNavigateToTab={setActiveTab}
             />
@@ -622,6 +624,7 @@ export default function App() {
             <MonthlyHistoryView 
               pulls={pulls}
               suppliers={suppliers}
+              labelPrints={labelPrints}
               onSelectPullForLabels={handleSelectPullForLabels}
               onSelectPullForSheet={handleSelectPullForSheet}
               onDeletePull={handleDeletePull}
