@@ -7,13 +7,15 @@ export interface LabelCustomConfig {
   gridBorderWidth: number;    // 1 to 3 px
   gridBorderColor: string;
 
-  // Font Sizes (compact label pixel sizes)
-  headerAmbevSize: number;     // 14 to 24px (default 19px)
-  headerCompanySize: number;   // 10 to 18px (default 12px)
-  productTitleSize: number;    // 11 to 20px (default 13.5px)
+  // Font Sizes & Element Dimensions (compact label pixel sizes)
+  logoHeightPx: number;        // 12 to 38px (default 18px)
+  headerAmbevSize: number;     // 14 to 28px (default 19px)
+  headerCompanySize: number;   // 10 to 22px (default 12px)
+  productTitleSize: number;    // 10 to 26px (default 13.5px)
   productTitleBold: boolean;   // true
+  carregAteBoxHeight: number;  // 18 to 44px (default 26px)
   carregAteLabelSize: number;  // 8 to 14px (default 9.5px)
-  carregAteDateSize: number;   // 18 to 32px (default 22px)
+  carregAteDateSize: number;   // 18 to 36px (default 22px)
   curvaLabelSize: number;      // 7 to 12px (default 8.5px)
   curvaLetterSize: number;     // 16 to 30px (default 21px)
   preBloqTextSize: number;     // 8 to 14px (default 9.5px)
@@ -56,10 +58,12 @@ export const DEFAULT_LABEL_CONFIG: LabelCustomConfig = {
   gridBorderWidth: 1.5,
   gridBorderColor: '#000000',
 
+  logoHeightPx: 18,
   headerAmbevSize: 19,
   headerCompanySize: 12,
   productTitleSize: 13.5,
   productTitleBold: true,
+  carregAteBoxHeight: 26,
   carregAteLabelSize: 9.5,
   carregAteDateSize: 22,
   curvaLabelSize: 8.5,
@@ -103,9 +107,11 @@ export const PRESET_LABEL_CONFIGS: Record<string, { name: string; desc: string; 
       innerBorderWidth: 1.5,
       gridBorderWidth: 1.5,
       tableMode: 'excel_7_cols',
+      logoHeightPx: 18,
       headerAmbevSize: 19,
       headerCompanySize: 12,
       productTitleSize: 13.5,
+      carregAteBoxHeight: 26,
       carregAteDateSize: 22,
       curvaLetterSize: 21,
       validityDateSize: 18,
@@ -114,6 +120,26 @@ export const PRESET_LABEL_CONFIGS: Record<string, { name: string; desc: string; 
       tableHeaderBgColor: '#ffffff',
       tableHeaderTextColor: '#000000',
       highlightCarregAteBorder: false
+    }
+  },
+  giant_elements: {
+    name: '🚀 Ícones & Títulos Expandidos (Máximo Destaque)',
+    desc: 'Logotipo ampliado, nome do produto maior e barra preta de Carregar Até com altura e data maximizadas.',
+    config: {
+      outerBorderWidth: 2.5,
+      innerBorderWidth: 1.5,
+      gridBorderWidth: 1.5,
+      tableMode: 'excel_7_cols',
+      logoHeightPx: 26,
+      headerAmbevSize: 24,
+      headerCompanySize: 14,
+      productTitleSize: 16,
+      carregAteBoxHeight: 34,
+      carregAteDateSize: 28,
+      curvaLetterSize: 24,
+      validityDateSize: 20,
+      tableHeaderSize: 8.5,
+      tableDataSize: 10.5
     }
   },
   thick_borders: {
@@ -125,9 +151,11 @@ export const PRESET_LABEL_CONFIGS: Record<string, { name: string; desc: string; 
       gridBorderWidth: 2,
       outerBorderColor: '#000000',
       tableMode: 'excel_7_cols',
+      logoHeightPx: 20,
       headerAmbevSize: 20,
       headerCompanySize: 13,
       productTitleSize: 14,
+      carregAteBoxHeight: 28,
       carregAteDateSize: 24,
       curvaLetterSize: 22,
       validityDateSize: 19,
@@ -143,9 +171,11 @@ export const PRESET_LABEL_CONFIGS: Record<string, { name: string; desc: string; 
       innerBorderWidth: 1.5,
       gridBorderWidth: 1.5,
       tableMode: 'excel_7_cols',
-      headerAmbevSize: 21,
+      logoHeightPx: 24,
+      headerAmbevSize: 22,
       headerCompanySize: 13.5,
-      productTitleSize: 15,
+      productTitleSize: 15.5,
+      carregAteBoxHeight: 32,
       carregAteDateSize: 26,
       curvaLetterSize: 24,
       validityDateSize: 20,

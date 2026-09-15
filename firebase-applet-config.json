@@ -1,12 +1,10 @@
 {
-  "projectId": "gen-lang-client-0624437496",
-  "appId": "1:701304893920:web:6c8b495653137d60357b85",
-  "apiKey": "AIzaSyAOVHg58KWp798onwm4Elx4gB_SCQDeJFo",
-  "authDomain": "gen-lang-client-0624437496.firebaseapp.com",
-  "firestoreDatabaseId": "ai-studio-sistemanrigestod-a25d04f4-7353-4d63-af8f-65d1d2abf610",
-  "storageBucket": "gen-lang-client-0624437496.firebasestorage.app",
-  "messagingSenderId": "701304893920",
-  "measurementId": "",
-  "oAuthClientId": "701304893920-vethqcf8158g27feuv4sf2dfs6vmcq8m.apps.googleusercontent.com",
-  "recaptchaSiteKey": ""
+  "projectId": "retorno-de-rota-pau-brasil",
+  "appId": "1:792483558739:web:1bcaba10d2038d7a6ddda6",
+  "apiKey": "AIzaSyC8Xkvh4Nj-VjzzDwqSNjefu3a79Y6ti2A",
+  "authDomain": "retorno-de-rota-pau-brasil.firebaseapp.com",
+  "firestoreDatabaseId": "",
+  "storageBucket": "retorno-de-rota-pau-brasil.firebasestorage.app",
+  "messagingSenderId": "792483558739",
+  "measurementId": "G-FTGZF84NKM"
 }

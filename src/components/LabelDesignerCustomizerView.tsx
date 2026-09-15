@@ -30,6 +30,8 @@ import {
 } from '../utils/labelConfig';
 import { saveLabelConfigToFirestore, logLabelPrintToFirestore, logActivityToFirestore } from '../services/firebase';
 import { NRILabelCard, LabelFaceEntry } from './NRILabelCard';
+import { InteractiveLabelPreview } from './InteractiveLabelPreview';
+import { LabelMaximizedModal } from './LabelMaximizedModal';
 import { getStoredBrandSettings, BrandSettings } from '../utils/branding';
 import { PullRecord, ProductCatalogItem, LabelPrintEvent } from '../types';
 import { executePrintJob } from '../utils/printHelper';
@@ -52,6 +54,7 @@ export const LabelDesignerCustomizerView: React.FC<LabelDesignerCustomizerViewPr
   const [zoomLevel, setZoomLevel] = useState<number>(1.2);
   const [saveFeedback, setSaveFeedback] = useState<boolean>(false);
   const [activePreset, setActivePreset] = useState<string>('excel_standard');
+  const [isMaximizedModalOpen, setIsMaximizedModalOpen] = useState<boolean>(false);
 
   // Test data reflecting user's screenshot exactly
   const [testProductCode, setTestProductCode] = useState('17808');
@@ -276,6 +279,16 @@ export const LabelDesignerCustomizerView: React.FC<LabelDesignerCustomizerViewPr
 
         {/* Top Actions */}
         <div className="flex flex-wrap items-center gap-2.5">
+          <button
+            type="button"
+            onClick={() => setIsMaximizedModalOpen(true)}
+            className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-purple-600 via-indigo-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white font-black rounded-xl text-xs transition-all shadow-md cursor-pointer hover:scale-105"
+            title="Abrir tela maximizada para segurar e aumentar o ícone, o produto e a barra preta diretamente na etiqueta"
+          >
+            <Maximize2 className="w-4 h-4 text-amber-300" />
+            <span>Maximizar Exemplo (Ajuste Direto)</span>
+          </button>
+
           <button
             type="button"
             onClick={handleReset}
@@ -600,6 +613,33 @@ export const LabelDesignerCustomizerView: React.FC<LabelDesignerCustomizerViewPr
                 <span className="text-[11px] font-mono font-bold text-slate-500">Valores em Pixels</span>
               </div>
 
+              {/* TAB 2: FONTS */}
+              {/* Logo / Icon Size */}
+              <div className="space-y-1 bg-blue-50/60 p-3 rounded-2xl border border-blue-200">
+                <div className="flex justify-between items-center text-xs">
+                  <label className="font-black text-blue-900 flex items-center gap-1.5">
+                    <span>🖼️ Tamanho do Ícone / Logotipo (Topo):</span>
+                  </label>
+                  <span className="font-mono font-black text-blue-700 bg-white px-2 py-0.5 rounded-lg border border-blue-200">
+                    {config.logoHeightPx || 18}px
+                  </span>
+                </div>
+                <input
+                  type="range"
+                  min="12"
+                  max="38"
+                  step="1"
+                  value={config.logoHeightPx || 18}
+                  onChange={(e) => {
+                    const val = parseFloat(e.target.value);
+                    updateProp('logoHeightPx', val);
+                    updateProp('headerAmbevSize', Math.min(30, Math.max(14, Math.round(val * 1.05))));
+                  }}
+                  className="w-full accent-blue-600 cursor-pointer"
+                />
+                <span className="text-[10px] text-blue-700">Dica: Você também pode clicar e segurar a alça azul diretamente na etiqueta!</span>
+              </div>
+
               {/* Product SKU & Description */}
               <div className="space-y-1">
                 <div className="flex justify-between items-center text-xs">
@@ -610,8 +650,8 @@ export const LabelDesignerCustomizerView: React.FC<LabelDesignerCustomizerViewPr
                 </div>
                 <input
                   type="range"
-                  min="11"
-                  max="20"
+                  min="10"
+                  max="26"
                   step="0.5"
                   value={config.productTitleSize}
                   onChange={(e) => updateProp('productTitleSize', parseFloat(e.target.value))}
@@ -629,13 +669,35 @@ export const LabelDesignerCustomizerView: React.FC<LabelDesignerCustomizerViewPr
                 </div>
                 <input
                   type="range"
-                  min="18"
-                  max="32"
+                  min="16"
+                  max="38"
                   step="1"
                   value={config.carregAteDateSize}
                   onChange={(e) => updateProp('carregAteDateSize', parseInt(e.target.value))}
                   className="w-full accent-purple-600 cursor-pointer"
                 />
+              </div>
+
+              {/* Black Box Height */}
+              <div className="space-y-1 bg-amber-50/60 p-3 rounded-2xl border border-amber-200">
+                <div className="flex justify-between items-center text-xs">
+                  <label className="font-black text-amber-900 flex items-center gap-1.5">
+                    <span>⬛ Altura da Barra Preta (Carregar até):</span>
+                  </label>
+                  <span className="font-mono font-black text-amber-700 bg-white px-2 py-0.5 rounded-lg border border-amber-200">
+                    {config.carregAteBoxHeight || 26}px
+                  </span>
+                </div>
+                <input
+                  type="range"
+                  min="18"
+                  max="48"
+                  step="1"
+                  value={config.carregAteBoxHeight || 26}
+                  onChange={(e) => updateProp('carregAteBoxHeight', parseInt(e.target.value))}
+                  className="w-full accent-amber-600 cursor-pointer"
+                />
+                <span className="text-[10px] text-amber-700">Aumenta a área preta destacada da data de giro.</span>
               </div>
 
               {/* Curva Letter */}
@@ -1072,6 +1134,15 @@ export const LabelDesignerCustomizerView: React.FC<LabelDesignerCustomizerViewPr
 
             {/* View Mode & Zoom controls */}
             <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setIsMaximizedModalOpen(true)}
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white font-bold rounded-xl text-xs transition-all shadow-xs cursor-pointer"
+                title="Maximizar tela de exemplo"
+              >
+                <Maximize2 className="w-3.5 h-3.5 text-amber-300" />
+                <span>Tela Cheia</span>
+              </button>
               <div className="bg-slate-800 p-1 rounded-xl flex items-center gap-1 border border-slate-700">
                 <button
                   type="button"
@@ -1131,12 +1202,14 @@ export const LabelDesignerCustomizerView: React.FC<LabelDesignerCustomizerViewPr
                 }}
                 className="w-full max-w-[200mm] shadow-2xl"
               >
-                <NRILabelCard
+                <InteractiveLabelPreview
+                  labelConfig={config}
+                  brand={brand}
                   entry={mockEntry}
                   currentPull={mockPull}
-                  brand={brand}
-                  labelConfig={config}
-                  variant="a4_4_per_page"
+                  onUpdateProp={updateProp}
+                  scale={1.2}
+                  showGuides={true}
                 />
               </div>
             ) : (
@@ -1193,6 +1266,15 @@ export const LabelDesignerCustomizerView: React.FC<LabelDesignerCustomizerViewPr
         </div>
 
       </div>
+
+      {/* MODAL MAXIMIZADO */}
+      <LabelMaximizedModal
+        isOpen={isMaximizedModalOpen}
+        onClose={() => setIsMaximizedModalOpen(false)}
+        currentPull={mockPull}
+        catalog={catalog}
+        onConfigSaved={(newCfg) => setConfig(newCfg)}
+      />
 
     </div>
   );

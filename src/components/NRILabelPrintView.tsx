@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Printer, ArrowLeft, Layers, Filter, CheckCircle2, Image as ImageIcon, LayoutGrid, ExternalLink, Building2, SlidersHorizontal, Cloud, Zap } from 'lucide-react';
+import { Printer, ArrowLeft, Layers, Filter, CheckCircle2, Image as ImageIcon, LayoutGrid, ExternalLink, Building2, SlidersHorizontal, Cloud, Zap, Maximize2 } from 'lucide-react';
 import { PullRecord, NRIItem, ProductCatalogItem, SupplierItem, LabelPrintEvent } from '../types';
 import { formatDateBR, getAbcBadgeColor, subtractDaysFromDate } from '../utils/nriCalculations';
 import { PauBrasilLogo } from './PauBrasilLogo';
@@ -7,6 +7,7 @@ import { getStoredBrandSettings, BrandSettings } from '../utils/branding';
 import { getStoredLabelConfig, LabelCustomConfig } from '../utils/labelConfig';
 import { NRILabelCard } from './NRILabelCard';
 import { BrandingModal } from './BrandingModal';
+import { LabelMaximizedModal } from './LabelMaximizedModal';
 import { INITIAL_PRODUCTS } from '../data/initialCatalog';
 import { executePrintJob } from '../utils/printHelper';
 import { logLabelPrintToFirestore, savePullToFirestore } from '../services/firebase';
@@ -63,6 +64,7 @@ export const NRILabelPrintView: React.FC<NRILabelPrintViewProps> = ({
   const [facesPerPallet, setFacesPerPallet] = useState<number>(4); // 4 faces per pallet (Frente, Verso, Dir, Esq) = 1 folha A4 por pallet
   const [printSize, setPrintSize] = useState<'a4_4_per_page' | 'a4_double' | 'a4_single' | 'thermal'>('a4_4_per_page'); // 4 labels per A4 sheet (1x4 vertical)
   const [showLocalBrandingModal, setShowLocalBrandingModal] = useState(false);
+  const [isMaximizedModalOpen, setIsMaximizedModalOpen] = useState(false);
 
   const allSuppliers = (suppliers && suppliers.length > 0) ? suppliers : INITIAL_SUPPLIERS;
 
@@ -348,6 +350,16 @@ export const NRILabelPrintView: React.FC<NRILabelPrintViewProps> = ({
         {/* Filters and Print buttons */}
         <div className="flex flex-wrap items-center gap-2.5">
           
+          <button
+            type="button"
+            onClick={() => setIsMaximizedModalOpen(true)}
+            className="flex items-center gap-1.5 px-3.5 py-2 bg-gradient-to-r from-purple-600 via-indigo-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white font-black rounded-xl text-xs transition-all shadow-md cursor-pointer hover:scale-105"
+            title="Abrir tela maximizada para segurar e aumentar ícone, produto e barra preta diretamente"
+          >
+            <Maximize2 className="w-3.5 h-3.5 text-amber-300" />
+            <span>Maximizar Exemplo (Ajuste Direto)</span>
+          </button>
+
           {onNavigateToDesigner && (
             <button
               type="button"
@@ -459,6 +471,31 @@ export const NRILabelPrintView: React.FC<NRILabelPrintViewProps> = ({
         </div>
       </div>
 
+      {/* DIRECT RESIZING ASSISTANT BANNER */}
+      <div className="print:hidden flex flex-wrap items-center justify-between p-3.5 bg-gradient-to-r from-purple-900 via-indigo-950 to-slate-900 text-white rounded-2xl shadow-md border border-purple-500/40 gap-3">
+        <div className="flex items-center gap-3">
+          <div className="w-9 h-9 rounded-xl bg-purple-500/30 border border-purple-400/50 flex items-center justify-center text-amber-300 shrink-0">
+            <Maximize2 className="w-5 h-5" />
+          </div>
+          <div>
+            <span className="text-xs font-black uppercase tracking-wide text-amber-300 block">
+              Deseja aumentar o ícone, o nome do produto ou a barra preta de Carregar até?
+            </span>
+            <span className="text-[11px] text-slate-300 font-medium">
+              Abra a tela maximizada para segurar e aumentar esses elementos diretamente sobre o exemplo da etiqueta.
+            </span>
+          </div>
+        </div>
+        <button
+          type="button"
+          onClick={() => setIsMaximizedModalOpen(true)}
+          className="px-4 py-2 bg-purple-600 hover:bg-purple-500 active:bg-purple-700 text-white font-black rounded-xl text-xs transition-all shadow-md cursor-pointer flex items-center gap-1.5"
+        >
+          <Maximize2 className="w-3.5 h-3.5" />
+          <span>Abrir Tela Maximizada de Ajuste</span>
+        </button>
+      </div>
+
       {/* Pages Render Container */}
       <div 
         id="printable-sheets-container" 
@@ -495,6 +532,15 @@ export const NRILabelPrintView: React.FC<NRILabelPrintViewProps> = ({
           onClose={() => setShowLocalBrandingModal(false)}
         />
       )}
+
+      {/* MODAL MAXIMIZADO PARA AJUSTE DIRETO */}
+      <LabelMaximizedModal
+        isOpen={isMaximizedModalOpen}
+        onClose={() => setIsMaximizedModalOpen(false)}
+        currentPull={currentPull}
+        catalog={catalog}
+        onConfigSaved={(newCfg) => setLabelConfig(newCfg)}
+      />
 
     </div>
   );

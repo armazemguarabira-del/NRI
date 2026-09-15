@@ -115,7 +115,12 @@ export const NRILabelCard: React.FC<NRILabelCardProps> = ({
             <img 
               src={brand.secondaryLogoUrl} 
               alt="Ambev" 
-              className={isCompact ? "h-4 max-h-4 max-w-[65px] object-contain" : "h-9 max-h-9 max-w-[120px] object-contain"} 
+              style={{
+                height: `${(labelConfig.logoHeightPx || 18) * scale}px`,
+                maxHeight: `${(labelConfig.logoHeightPx || 18) * 1.5 * scale}px`,
+                maxWidth: `${(labelConfig.logoHeightPx || 18) * 4 * scale}px`
+              }}
+              className="object-contain" 
               referrerPolicy="no-referrer"
             />
           ) : (
@@ -147,11 +152,24 @@ export const NRILabelCard: React.FC<NRILabelCardProps> = ({
               <img 
                 src={brand.primaryLogoUrl} 
                 alt="Logo Pau Brasil" 
-                className={isCompact ? "h-4 max-h-4 max-w-[65px] object-contain shrink-0" : "h-10 max-h-10 max-w-[120px] object-contain shrink-0"} 
+                style={{
+                  height: `${(labelConfig.logoHeightPx || 18) * scale}px`,
+                  maxHeight: `${(labelConfig.logoHeightPx || 18) * 1.5 * scale}px`,
+                  maxWidth: `${(labelConfig.logoHeightPx || 18) * 4 * scale}px`
+                }}
+                className="object-contain shrink-0" 
                 referrerPolicy="no-referrer"
               />
             ) : (
-              <PauBrasilLogo size={isCompact ? "sm" : "md"} showText={false} className="shrink-0 scale-75 sm:scale-85" />
+              <div 
+                style={{ 
+                  transform: `scale(${((labelConfig.logoHeightPx || 18) / 18)})`, 
+                  transformOrigin: 'right center' 
+                }}
+                className="shrink-0 inline-flex items-center"
+              >
+                <PauBrasilLogo size={isCompact ? "sm" : "md"} showText={false} className="shrink-0" />
+              </div>
             )
           )}
         </div>
@@ -195,9 +213,12 @@ export const NRILabelCard: React.FC<NRILabelCardProps> = ({
           style={{
             backgroundColor: labelConfig.carregAteBgColor,
             color: labelConfig.carregAteTextColor,
-            border: labelConfig.highlightCarregAteBorder ? '2px solid #16a34a' : 'none'
+            border: labelConfig.highlightCarregAteBorder ? '2px solid #16a34a' : 'none',
+            minHeight: labelConfig.carregAteBoxHeight ? `${labelConfig.carregAteBoxHeight * scale}px` : undefined,
+            paddingTop: `${Math.max(2, (labelConfig.carregAteBoxHeight ? labelConfig.carregAteBoxHeight * 0.12 : 4) * scale)}px`,
+            paddingBottom: `${Math.max(2, (labelConfig.carregAteBoxHeight ? labelConfig.carregAteBoxHeight * 0.12 : 4) * scale)}px`
           }}
-          className={`flex-1 text-center flex items-center justify-center ${isCompact ? 'py-0.5 px-1.5' : 'py-3.5 px-4'}`}
+          className={`flex-1 text-center flex items-center justify-center ${isCompact ? 'px-1.5' : 'px-4'}`}
         >
           <span 
             style={{ 

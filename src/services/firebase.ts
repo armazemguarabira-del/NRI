@@ -28,8 +28,11 @@ import { INITIAL_SUPPLIERS } from '../data/initialSuppliers';
 // Initialize Firebase App instance safely (singleton pattern)
 const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
 
-// Direct binding to the dedicated Firestore Database ID from configuration
-export const db = getFirestore(app, firebaseConfig.firestoreDatabaseId || undefined);
+// Direct binding to the Firestore Database (supports default or custom database IDs)
+const customDbId = (firebaseConfig as any).firestoreDatabaseId;
+export const db = (customDbId && customDbId.trim() !== '' && customDbId !== '(default)')
+  ? getFirestore(app, customDbId)
+  : getFirestore(app);
 
 // Validate connection on boot as mandated by Firebase skill
 export async function testConnection(): Promise<boolean> {
