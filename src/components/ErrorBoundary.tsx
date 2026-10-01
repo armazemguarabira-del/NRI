@@ -11,13 +11,9 @@ interface State {
   error: Error | null;
 }
 
-export class ErrorBoundary extends (Component as any)<Props, State> {
-  props: Props;
-  state: State;
-
+export class ErrorBoundary extends Component<Props, State> {
   constructor(props: Props) {
     super(props);
-    this.props = props;
     this.state = {
       hasError: false,
       error: null,
@@ -50,7 +46,7 @@ export class ErrorBoundary extends (Component as any)<Props, State> {
         <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center p-6 text-white font-sans">
           <div className="max-w-md w-full bg-slate-900 border border-slate-800 rounded-3xl p-8 text-center shadow-2xl">
             <div className="flex justify-center mb-4">
-              <PauBrasilLogo size="lg" variant="symbol" />
+              <PauBrasilLogo size="lg" variant="icon_only" />
             </div>
 
             <div className="w-12 h-12 rounded-2xl bg-amber-500/20 text-amber-500 flex items-center justify-center mx-auto mb-4">

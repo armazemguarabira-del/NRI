@@ -224,7 +224,7 @@ export const NRIConferenceSheetPrintView: React.FC<NRIConferenceSheetPrintViewPr
                 </div>
                 <div className="grid grid-cols-2">
                   <span className="bg-amber-400 p-1.5 font-bold uppercase text-center text-[11px] border-r border-slate-400">SKUs TT</span>
-                  <span className="p-1.5 font-black text-center text-[11px] font-mono">{currentPull.totalQuantity}</span>
+                  <span className="p-1.5 font-black text-center text-[11px] font-mono">{currentPull.totalQuantity || currentPull.totalSku}</span>
                 </div>
                 <div className="grid grid-cols-2">
                   <span className="bg-amber-400 p-1.5 font-bold uppercase text-center text-[11px] border-r border-slate-400">HL Total</span>
@@ -315,7 +315,7 @@ export const NRIConferenceSheetPrintView: React.FC<NRIConferenceSheetPrintViewPr
                 <td colSpan={4} className="p-2 text-right border-r border-slate-400">TOTAIS DA CARRETA:</td>
                 <td className="p-2 border-r border-slate-400 font-mono">{currentPull.totalPallets} Plts</td>
                 <td className="p-2 border-r border-slate-400 font-mono">-</td>
-                <td className="p-2 border-r border-slate-400 font-mono">{currentPull.totalQuantity} sku</td>
+                <td className="p-2 border-r border-slate-400 font-mono">{currentPull.totalQuantity || currentPull.totalSku} sku</td>
                 <td colSpan={5} className="p-2 font-mono text-left pl-4">Volume: {currentPull.totalHectoliters.toFixed(2)} HL | Valor: {formatBRL(currentPull.totalValue)}</td>
               </tr>
             </tfoot>

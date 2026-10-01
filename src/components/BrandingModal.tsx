@@ -42,28 +42,64 @@ export const BrandingModal: React.FC<BrandingModalProps> = ({ isOpen, onClose })
       return;
     }
 
-    // Limit file size (max 4MB for localStorage)
-    if (file.size > 4 * 1024 * 1024) {
-      alert('A imagem é muito grande. Escolha um arquivo com menos de 4MB.');
-      return;
-    }
-
     const reader = new FileReader();
     reader.onload = (e) => {
-      const dataUrl = e.target?.result as string;
-      if (target === 'primary') {
-        const updated = { ...settings, primaryLogoUrl: dataUrl };
-        setSettings(updated);
-        saveStoredBrandSettings(updated);
-        saveBrandSettingsToFirestore(updated).catch(err => console.error('Firestore brand sync error:', err));
-      } else {
-        const updated = { ...settings, secondaryLogoUrl: dataUrl };
-        setSettings(updated);
-        saveStoredBrandSettings(updated);
-        saveBrandSettingsToFirestore(updated).catch(err => console.error('Firestore brand sync error:', err));
-      }
-      setSaveSuccess(true);
-      setTimeout(() => setSaveSuccess(false), 2500);
+      const rawDataUrl = e.target?.result as string;
+      const img = new Image();
+      img.onload = () => {
+        // Compress/resize if needed so it stays under 500KB and fits Firestore 1MB doc limit perfectly
+        const maxDimension = 600;
+        let width = img.width;
+        let height = img.height;
+
+        if (width > maxDimension || height > maxDimension) {
+          if (width > height) {
+            height = Math.round((height * maxDimension) / width);
+            width = maxDimension;
+          } else {
+            width = Math.round((width * maxDimension) / height);
+            height = maxDimension;
+          }
+        }
+
+        const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        if (ctx) {
+          ctx.drawImage(img, 0, 0, width, height);
+          const compressedDataUrl = canvas.toDataURL(file.type === 'image/jpeg' ? 'image/jpeg' : 'image/png', 0.88);
+
+          if (target === 'primary') {
+            const updated = { ...settings, primaryLogoUrl: compressedDataUrl };
+            setSettings(updated);
+            saveStoredBrandSettings(updated);
+            saveBrandSettingsToFirestore(updated).catch(err => console.error('Firestore brand sync error:', err));
+          } else {
+            const updated = { ...settings, secondaryLogoUrl: compressedDataUrl };
+            setSettings(updated);
+            saveStoredBrandSettings(updated);
+            saveBrandSettingsToFirestore(updated).catch(err => console.error('Firestore brand sync error:', err));
+          }
+        } else {
+          // Fallback to raw data url
+          if (target === 'primary') {
+            const updated = { ...settings, primaryLogoUrl: rawDataUrl };
+            setSettings(updated);
+            saveStoredBrandSettings(updated);
+            saveBrandSettingsToFirestore(updated).catch(err => console.error('Firestore brand sync error:', err));
+          } else {
+            const updated = { ...settings, secondaryLogoUrl: rawDataUrl };
+            setSettings(updated);
+            saveStoredBrandSettings(updated);
+            saveBrandSettingsToFirestore(updated).catch(err => console.error('Firestore brand sync error:', err));
+          }
+        }
+
+        setSaveSuccess(true);
+        setTimeout(() => setSaveSuccess(false), 2500);
+      };
+      img.src = rawDataUrl;
     };
     reader.readAsDataURL(file);
   };

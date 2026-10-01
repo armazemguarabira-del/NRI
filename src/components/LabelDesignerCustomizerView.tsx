@@ -111,7 +111,7 @@ export const LabelDesignerCustomizerView: React.FC<LabelDesignerCustomizerViewPr
       category: 'CONFIGURACAO',
       severity: 'info',
       title: 'Layout de Etiquetas Customizado Salvo',
-      description: `Bordas ajustadas (Externa: ${config.borderThicknessOuter}px, Interna: ${config.borderThicknessInner}px), fontes (${config.fontSizeTitle} / ${config.fontSizeValues}) salvas no banco Firestore`,
+      description: `Bordas ajustadas (Externa: ${config.outerBorderWidth}px, Interna: ${config.innerBorderWidth}px), fontes (${config.productTitleSize}px / ${config.carregAteDateSize}px) salvas no banco Firestore`,
       userName: testConferente || 'Operador'
     }).catch(() => {});
     setSaveFeedback(true);

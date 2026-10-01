@@ -400,6 +400,36 @@ export default function App() {
     }
   };
 
+  // Prefill state for PNC when opened from Blitz
+  const [prefillPncModal, setPrefillPncModal] = useState<Partial<PNCRecord> | null>(null);
+
+  const handleUpdatePncs = async (updatedPncs: PNCRecord[]) => {
+    try {
+      const existingIds = new Set(updatedPncs.map(p => p.id));
+      for (const old of pncRecords) {
+        if (!existingIds.has(old.id)) {
+          await deletePNCFromFirestore(old.id);
+        }
+      }
+      for (const p of updatedPncs) {
+        await savePNCToFirestore(p);
+      }
+      setPncRecords(updatedPncs);
+    } catch (e) {
+      console.error('Error updating PNCs in Firestore:', e);
+      setPncRecords(updatedPncs);
+    }
+  };
+
+  const handleUpdateReportItems = async (items: Report030519Item[]) => {
+    setReportItems(items);
+    try {
+      await saveReport030519ToFirestore(items);
+    } catch (e) {
+      console.error('Error saving report items to Firestore:', e);
+    }
+  };
+
   const handleAddBlitzRecord = async (newBlitz: BlitzRecord, createPNC?: boolean) => {
     try {
       await saveBlitzToFirestore(newBlitz);
@@ -592,7 +622,7 @@ export default function App() {
               labelPrints={labelPrints}
               isDbConnected={isDbConnected}
               onSelectPullForLabels={handleSelectPullForLabels}
-              onNavigateToTab={setActiveTab}
+              onNavigateToTab={(tab) => setActiveTab(tab as NavTabType)}
             />
           )}
 
@@ -608,13 +638,18 @@ export default function App() {
               initialPull={editingPull}
               onCancelEdit={() => setEditingPull(null)}
               currentUser={currentUser}
-              onQuickRegisterProduct={(newProd) => {
+              onQuickRegisterProduct={async (newProd) => {
                 setCatalog(prev => {
                   if (prev.some(p => p.code === newProd.code)) {
                     return prev.map(p => p.code === newProd.code ? newProd : p);
                   }
                   return [...prev, newProd];
                 });
+                try {
+                  await saveCatalogItemToFirestore(newProd);
+                } catch (e) {
+                  console.error('Error saving new product to Firestore:', e);
+                }
               }}
             />
           )}
@@ -640,7 +675,10 @@ export default function App() {
               pulls={pulls}
               catalog={catalog}
               onUpdateBlitzRecords={handleUpdateBlitzRecords}
-              onOpenPNCModal={() => setActiveTab('pnc')}
+              onOpenPNCModal={(pncData) => {
+                setPrefillPncModal(pncData);
+                setActiveTab('pnc');
+              }}
               onNavigateToPNC={() => setActiveTab('pnc')}
               currentUser={currentUser}
             />
@@ -650,10 +688,12 @@ export default function App() {
           {activeTab === 'pnc' && (
             <PNCView
               pncs={pncRecords}
-              onUpdatePncs={setPncRecords}
+              onUpdatePncs={handleUpdatePncs}
               pulls={pulls}
               catalog={catalog}
               currentUser={currentUser}
+              prefillPncModal={prefillPncModal}
+              onClearPrefillPncModal={() => setPrefillPncModal(null)}
               onNavigateToBlitz={() => setActiveTab('blitz')}
             />
           )}
@@ -677,7 +717,7 @@ export default function App() {
           {activeTab === 'report_030519' && (
             <Report030519View 
               reportItems={reportItems}
-              onUpdateReportItems={setReportItems}
+              onUpdateReportItems={handleUpdateReportItems}
               catalog={catalog}
               onUpdateCatalog={handleUpdateCatalog}
             />

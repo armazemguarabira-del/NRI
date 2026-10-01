@@ -118,6 +118,11 @@ export interface NRIPullHeader {
   pbr2Count: number;        // PBRII
   chapatexCount: number;    // Chapatex
   notes?: string;
+  transporterName?: string;
+  driverName?: string;
+  truckModel?: string;
+  lacres?: string;
+  observations?: string;
   createdAt: string;
 }
 
@@ -126,6 +131,7 @@ export interface PullRecord {
   items: NRIItem[];
   totalPallets: number;
   totalSku: number;
+  totalQuantity?: number;
   totalHectoliters: number;
   totalValue: number;
   hasValidityAlert: boolean;
@@ -250,7 +256,7 @@ export interface LabelPrintEvent {
   notes?: string;
 }
 
-export type ActivityCategory = 'ETIQUETAS' | 'PUXADA' | 'AVARIA' | 'BLOQUEIO' | 'SISTEMA' | 'CONFIGURACAO';
+export type ActivityCategory = 'ETIQUETAS' | 'PUXADA' | 'AVARIA' | 'BLOQUEIO' | 'SISTEMA' | 'CONFIGURACAO' | 'CADASTRO' | 'USUARIOS';
 export type ActivitySeverity = 'info' | 'success' | 'warning' | 'critical';
 
 export interface ActivityLogEvent {

@@ -264,7 +264,7 @@ export const ProductSearchCombobox: React.FC<ProductSearchComboboxProps> = ({
                         <span>•</span>
                         <span>Hecto: <strong className={theme === 'light' ? 'text-slate-800 font-bold' : 'text-slate-200'}>{p.hectoliterFactor}</strong></span>
                         <span>•</span>
-                        <span>Emb: <strong className={theme === 'light' ? 'text-slate-800 font-bold' : 'text-slate-200'}>{p.packageType}</strong></span>
+                        <span>Emb: <strong className={theme === 'light' ? 'text-slate-800 font-bold' : 'text-slate-200'}>{p.packaging || p.unit}</strong></span>
                       </div>
                     </div>
                   </div>

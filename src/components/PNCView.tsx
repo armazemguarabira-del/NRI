@@ -36,6 +36,7 @@ interface PNCViewProps {
   prefillPncModal?: Partial<PNCRecord> | null;
   onClearPrefillPncModal?: () => void;
   currentUser?: UserAccount | null;
+  onNavigateToBlitz?: () => void;
 }
 
 export const PNCView: React.FC<PNCViewProps> = ({

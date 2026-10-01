@@ -376,6 +376,7 @@ export async function saveBlitzToFirestore(record: BlitzRecord): Promise<void> {
 
 export async function deleteBlitzFromFirestore(id: string): Promise<void> {
   const existing = getCachedData<BlitzRecord[]>(CACHE_KEYS.BLITZ, []);
+  const target = existing.find(b => b.id === id);
   setCachedData(CACHE_KEYS.BLITZ, existing.filter(b => b.id !== id));
 
   try {
@@ -384,6 +385,15 @@ export async function deleteBlitzFromFirestore(id: string): Promise<void> {
   } catch (err) {
     console.error('Error deleting Blitz from Firestore:', err);
   }
+
+  logActivityToFirestore({
+    category: 'AVARIA',
+    severity: 'info',
+    title: 'Blitz Excluída',
+    description: `Registro de Blitz ${target?.nfeNumber ? `NF ${target.nfeNumber}` : id} foi excluído`,
+    userName: 'Sistema / Conferente',
+    referenceId: id
+  }).catch(() => {});
 }
 
 export async function savePNCToFirestore(record: PNCRecord): Promise<void> {
@@ -412,6 +422,7 @@ export async function savePNCToFirestore(record: PNCRecord): Promise<void> {
 
 export async function deletePNCFromFirestore(id: string): Promise<void> {
   const existing = getCachedData<PNCRecord[]>(CACHE_KEYS.PNCS, []);
+  const target = existing.find(p => p.id === id);
   setCachedData(CACHE_KEYS.PNCS, existing.filter(p => p.id !== id));
 
   try {
@@ -420,6 +431,15 @@ export async function deletePNCFromFirestore(id: string): Promise<void> {
   } catch (err) {
     console.error('Error deleting PNC from Firestore:', err);
   }
+
+  logActivityToFirestore({
+    category: 'BLOQUEIO',
+    severity: 'warning',
+    title: 'PNC Excluído',
+    description: `Registro ${target?.pncNumber || id} (NF ${target?.nfeNumber || ''}) foi removido do sistema`,
+    userName: 'Qualidade / Conferência',
+    referenceId: id
+  }).catch(() => {});
 }
 
 export async function saveReport030519ToFirestore(items: Report030519Item[]): Promise<void> {
@@ -458,10 +478,21 @@ export async function saveCatalogItemToFirestore(item: ProductCatalogItem): Prom
   } catch (err) {
     console.error('Error writing Catalog item to Firestore:', err);
   }
+
+  logActivityToFirestore({
+    category: 'CADASTRO',
+    severity: 'info',
+    title: idx >= 0 ? 'Produto Atualizado' : 'Novo Produto Cadastrado',
+    description: `SKU ${item.code} - ${item.description} (Curva ${item.abcClass || 'B'}) salvo no banco de dados`,
+    userName: 'Sistema / Gestor',
+    referenceId: item.code,
+    metadata: { code: item.code, description: item.description, price: item.price, palletFactor: item.palletFactor }
+  }).catch(() => {});
 }
 
 export async function deleteCatalogItemFromFirestore(code: string): Promise<void> {
   const existing = getCachedData<ProductCatalogItem[]>(CACHE_KEYS.CATALOG, []);
+  const target = existing.find(c => c.code === code);
   setCachedData(CACHE_KEYS.CATALOG, existing.filter(c => c.code !== code));
 
   try {
@@ -470,13 +501,33 @@ export async function deleteCatalogItemFromFirestore(code: string): Promise<void
   } catch (err) {
     console.error('Error deleting Catalog item from Firestore:', err);
   }
+
+  logActivityToFirestore({
+    category: 'CADASTRO',
+    severity: 'warning',
+    title: 'Produto Removido do Catálogo',
+    description: `SKU ${code} - ${target?.description || ''} foi excluído do banco de dados`,
+    userName: 'Sistema / Gestor',
+    referenceId: code
+  }).catch(() => {});
 }
 
 export async function saveCatalogToFirestore(items: ProductCatalogItem[]): Promise<void> {
+  const previous = getCachedData<ProductCatalogItem[]>(CACHE_KEYS.CATALOG, []);
   setCachedData(CACHE_KEYS.CATALOG, items);
 
   try {
+    const currentCodes = new Set(items.map(it => it.code));
     const batch = writeBatch(db);
+
+    // Delete items that were removed
+    for (const prev of previous) {
+      if (!currentCodes.has(prev.code)) {
+        batch.delete(doc(db, COLLECTIONS.CATALOG, `prod-${prev.code}`));
+      }
+    }
+
+    // Save or update current items
     for (const it of items) {
       const ref = doc(db, COLLECTIONS.CATALOG, `prod-${it.code}`);
       batch.set(ref, it, { merge: true });
@@ -485,6 +536,14 @@ export async function saveCatalogToFirestore(items: ProductCatalogItem[]): Promi
   } catch (err) {
     console.error('Error writing Catalog list to Firestore:', err);
   }
+
+  logActivityToFirestore({
+    category: 'CADASTRO',
+    severity: 'info',
+    title: 'Catálogo de Produtos Sincronizado',
+    description: `${items.length} produtos atualizados no banco de dados Firestore`,
+    userName: 'Administrador NRI'
+  }).catch(() => {});
 }
 
 export async function clearCollectionInFirestore(collectionName: string): Promise<void> {
@@ -581,13 +640,41 @@ export function subscribeToUsers(onUpdate: (users: UserAccount[]) => void) {
 }
 
 export async function saveUserToFirestore(user: UserAccount): Promise<void> {
+  const existing = getCachedData<UserAccount[]>(CACHE_KEYS.USERS, DEFAULT_USERS);
+  const idx = existing.findIndex(u => u.id === user.id);
+  const isNew = idx < 0;
+  const updated = isNew ? [...existing, user] : existing.map(u => u.id === user.id ? user : u);
+  setCachedData(CACHE_KEYS.USERS, updated);
+
   const userRef = doc(db, COLLECTIONS.USERS, user.id);
   await setDoc(userRef, user, { merge: true });
+
+  logActivityToFirestore({
+    category: 'USUARIOS',
+    severity: 'info',
+    title: isNew ? 'Novo Usuário Criado' : 'Usuário Atualizado',
+    description: `Usuário ${user.fullName} (${user.role} - ${user.username}) salvo no banco de dados`,
+    userName: 'Administrador NRI',
+    referenceId: user.id
+  }).catch(() => {});
 }
 
 export async function deleteUserFromFirestore(userId: string): Promise<void> {
+  const existing = getCachedData<UserAccount[]>(CACHE_KEYS.USERS, DEFAULT_USERS);
+  const target = existing.find(u => u.id === userId);
+  setCachedData(CACHE_KEYS.USERS, existing.filter(u => u.id !== userId));
+
   const userRef = doc(db, COLLECTIONS.USERS, userId);
   await deleteDoc(userRef);
+
+  logActivityToFirestore({
+    category: 'USUARIOS',
+    severity: 'warning',
+    title: 'Usuário Removido',
+    description: `Acesso do usuário ${target?.fullName || userId} foi excluído do sistema`,
+    userName: 'Administrador NRI',
+    referenceId: userId
+  }).catch(() => {});
 }
 
 // ==========================================
@@ -651,8 +738,8 @@ export function subscribeToSuppliers(onUpdate: (suppliers: SupplierItem[]) => vo
 export async function saveSupplierToFirestore(supplier: SupplierItem): Promise<void> {
   const existing = getCachedData<SupplierItem[]>(CACHE_KEYS.SUPPLIERS, INITIAL_SUPPLIERS);
   const idx = existing.findIndex(s => s.id === supplier.id);
-  const updated = idx >= 0 ? [...existing] : [...existing, supplier];
-  if (idx >= 0) updated[idx] = supplier;
+  const isNew = idx < 0;
+  const updated = isNew ? [...existing, supplier] : existing.map(s => s.id === supplier.id ? supplier : s);
   setCachedData(CACHE_KEYS.SUPPLIERS, updated);
 
   try {
@@ -661,10 +748,20 @@ export async function saveSupplierToFirestore(supplier: SupplierItem): Promise<v
   } catch (err) {
     console.error('Error writing Supplier to Firestore:', err);
   }
+
+  logActivityToFirestore({
+    category: 'CADASTRO',
+    severity: 'info',
+    title: isNew ? 'Novo Fornecedor Cadastrado' : 'Fornecedor Atualizado',
+    description: `Fábrica/Fornecedor ${supplier.code} - ${supplier.name} (${supplier.type}) salvo no banco de dados`,
+    userName: 'Administrador NRI',
+    referenceId: supplier.id
+  }).catch(() => {});
 }
 
 export async function deleteSupplierFromFirestore(supplierId: string): Promise<void> {
   const existing = getCachedData<SupplierItem[]>(CACHE_KEYS.SUPPLIERS, INITIAL_SUPPLIERS);
+  const target = existing.find(s => s.id === supplierId);
   const filtered = existing.filter(s => s.id !== supplierId);
   setCachedData(CACHE_KEYS.SUPPLIERS, filtered);
 
@@ -674,6 +771,15 @@ export async function deleteSupplierFromFirestore(supplierId: string): Promise<v
   } catch (err) {
     console.error('Error deleting Supplier from Firestore:', err);
   }
+
+  logActivityToFirestore({
+    category: 'CADASTRO',
+    severity: 'warning',
+    title: 'Fornecedor Removido',
+    description: `Fábrica/Fornecedor ${target?.code ? `${target.code} - ${target.name}` : supplierId} foi excluído do sistema`,
+    userName: 'Administrador NRI',
+    referenceId: supplierId
+  }).catch(() => {});
 }
 
 export async function resetSuppliersToDefault(): Promise<void> {
