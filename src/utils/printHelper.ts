@@ -97,9 +97,9 @@ export function executePrintJob(elementId: string, documentTitle = 'Etiquetas_Pa
       .a4-print-sheet-4 {
         width: 210mm !important;
         max-width: 210mm !important;
-        height: 285mm !important;
-        max-height: 285mm !important;
-        min-height: 285mm !important;
+        height: 290mm !important;
+        max-height: 290mm !important;
+        min-height: 290mm !important;
         page-break-after: always !important;
         break-after: page !important;
         page-break-inside: avoid !important;
@@ -107,8 +107,8 @@ export function executePrintJob(elementId: string, documentTitle = 'Etiquetas_Pa
         display: flex !important;
         flex-direction: column !important;
         justify-content: space-between !important;
-        gap: 1mm !important;
-        padding: 2mm 3mm !important;
+        gap: 1.5mm !important;
+        padding: 2.5mm 3.5mm !important;
         margin: 0 auto !important;
         box-sizing: border-box !important;
         overflow: hidden !important;
@@ -120,16 +120,16 @@ export function executePrintJob(elementId: string, documentTitle = 'Etiquetas_Pa
       }
 
       .nri-label-card-4 {
-        height: 61mm !important;
-        max-height: 61mm !important;
-        min-height: 61mm !important;
+        height: 68mm !important;
+        max-height: 68mm !important;
+        min-height: 68mm !important;
         flex: 1 1 0 !important;
         overflow: hidden !important;
         box-sizing: border-box !important;
         page-break-inside: avoid !important;
         break-inside: avoid !important;
         border: 1.5px solid #000000 !important;
-        padding: 1mm 1.5mm !important;
+        padding: 1.5mm 2mm !important;
         display: flex !important;
         flex-direction: column !important;
         justify-content: space-between !important;

@@ -58,26 +58,26 @@ export const DEFAULT_LABEL_CONFIG: LabelCustomConfig = {
   gridBorderWidth: 1.5,
   gridBorderColor: '#000000',
 
-  logoHeightPx: 18,
-  headerAmbevSize: 19,
-  headerCompanySize: 12,
-  productTitleSize: 13.5,
+  logoHeightPx: 20,
+  headerAmbevSize: 21,
+  headerCompanySize: 16,
+  productTitleSize: 15,
   productTitleBold: true,
-  carregAteBoxHeight: 26,
-  carregAteLabelSize: 9.5,
-  carregAteDateSize: 22,
-  curvaLabelSize: 8.5,
-  curvaLetterSize: 21,
-  preBloqTextSize: 9.5,
-  preBloqDateSize: 11,
+  carregAteBoxHeight: 46,
+  carregAteLabelSize: 11,
+  carregAteDateSize: 32,
+  curvaLabelSize: 11,
+  curvaLetterSize: 30,
+  preBloqTextSize: 11.5,
+  preBloqDateSize: 12.5,
   recebTextSize: 9.5,
   recebDateSize: 11,
-  validityLabelSize: 11,
-  validityDateSize: 18,
+  validityLabelSize: 12,
+  validityDateSize: 14,
   tableHeaderSize: 8,
   tableDataSize: 10,
 
-  labelHeightMm: 61,
+  labelHeightMm: 68,
   labelPaddingMm: 1.5,
   tableMode: 'excel_7_cols',
   showPreBloq: true,
@@ -100,21 +100,26 @@ export const DEFAULT_LABEL_CONFIG: LabelCustomConfig = {
 
 export const PRESET_LABEL_CONFIGS: Record<string, { name: string; desc: string; config: Partial<LabelCustomConfig> }> = {
   excel_standard: {
-    name: '🎯 Padrão Planilha Excel (Fiel à Imagem)',
-    desc: 'Layout idêntico ao modelo Ambev: 7 colunas tabulares com bordas bem nítidas e preto de alto contraste.',
+    name: '🎯 Padrão Planilha A4 (Fiel à Folha)',
+    desc: 'Layout idêntico à folha A4 com 4 etiquetas: Ambev Guarabira, Curva lateral de 2 linhas, data em destaque preto e 7 colunas.',
     config: {
       outerBorderWidth: 2,
       innerBorderWidth: 1.5,
       gridBorderWidth: 1.5,
+      labelHeightMm: 68,
       tableMode: 'excel_7_cols',
-      logoHeightPx: 18,
-      headerAmbevSize: 19,
-      headerCompanySize: 12,
-      productTitleSize: 13.5,
-      carregAteBoxHeight: 26,
-      carregAteDateSize: 22,
-      curvaLetterSize: 21,
-      validityDateSize: 18,
+      logoHeightPx: 20,
+      headerAmbevSize: 21,
+      headerCompanySize: 16,
+      productTitleSize: 15,
+      carregAteBoxHeight: 46,
+      carregAteDateSize: 32,
+      curvaLabelSize: 11,
+      curvaLetterSize: 30,
+      preBloqTextSize: 11.5,
+      preBloqDateSize: 12.5,
+      validityLabelSize: 12,
+      validityDateSize: 14,
       tableHeaderSize: 8,
       tableDataSize: 10,
       tableHeaderBgColor: '#ffffff',
@@ -204,7 +209,14 @@ export function getStoredLabelConfig(): LabelCustomConfig {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (raw) {
       const parsed = JSON.parse(raw);
-      return { ...DEFAULT_LABEL_CONFIG, ...parsed };
+      const merged = { ...DEFAULT_LABEL_CONFIG, ...parsed };
+      if (!merged.carregAteBoxHeight || merged.carregAteBoxHeight < 42) {
+        merged.carregAteBoxHeight = 46;
+      }
+      if (!merged.carregAteDateSize || merged.carregAteDateSize < 28) {
+        merged.carregAteDateSize = 32;
+      }
+      return merged;
     }
   } catch (err) {
     console.warn('Error loading label config from localStorage:', err);

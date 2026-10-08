@@ -175,84 +175,92 @@ export const NRILabelCard: React.FC<NRILabelCardProps> = ({
         </div>
       </div>
 
-      {/* 2. PRODUCT CODE & DESCRIPTION CENTERED */}
-      <div 
-        style={{
-          fontSize: `${labelConfig.productTitleSize * scale}px`,
-          fontWeight: labelConfig.productTitleBold ? 900 : 700
-        }}
-        className={`text-center uppercase text-black tracking-tight leading-none px-0.5 truncate ${
-          isCompact ? 'py-0.5 my-0' : variant === 'a4_double' ? 'my-3 text-2xl' : 'my-4 text-3xl'
-        }`}
-      >
-        <span className="font-mono font-black text-black tracking-normal">{item.productCode}</span> – {item.description}
-      </div>
-
-      {/* 3. HERO SECTION: "Carreg até:" + GIANT BLACK BOX + CURVA ABC */}
-      <div className={`flex items-stretch justify-between gap-1 ${isCompact ? 'my-0.5' : 'my-2.5'}`}>
-        {/* Left: Carreg até: */}
-        <div 
-          className={`text-right flex flex-col justify-center leading-tight shrink-0 pr-1 ${isCompact ? 'min-w-[44px]' : 'min-w-[85px]'}`}
-        >
-          <span 
-            style={{ fontSize: `${labelConfig.carregAteLabelSize * scale}px` }}
-            className="font-black uppercase text-black leading-none"
-          >
-            Carreg
-          </span>
-          <span 
-            style={{ fontSize: `${labelConfig.carregAteLabelSize * scale}px` }}
-            className="font-black uppercase text-black leading-none"
-          >
-            até:
-          </span>
-        </div>
-
-        {/* Center: Giant Box with Load Until Date */}
-        <div 
-          style={{
-            backgroundColor: labelConfig.carregAteBgColor,
-            color: labelConfig.carregAteTextColor,
-            border: labelConfig.highlightCarregAteBorder ? '2px solid #16a34a' : 'none',
-            minHeight: labelConfig.carregAteBoxHeight ? `${labelConfig.carregAteBoxHeight * scale}px` : undefined,
-            paddingTop: `${Math.max(2, (labelConfig.carregAteBoxHeight ? labelConfig.carregAteBoxHeight * 0.12 : 4) * scale)}px`,
-            paddingBottom: `${Math.max(2, (labelConfig.carregAteBoxHeight ? labelConfig.carregAteBoxHeight * 0.12 : 4) * scale)}px`
-          }}
-          className={`flex-1 text-center flex items-center justify-center ${isCompact ? 'px-1.5' : 'px-4'}`}
-        >
-          <span 
-            style={{ 
-              fontSize: `${labelConfig.carregAteDateSize * scale}px`,
-              color: labelConfig.carregAteTextColor
+      {/* 2. MIDDLE HERO SECTION: Product + Carreg até on Left, CURVA Box spanning right */}
+      <div className={`flex items-stretch justify-between gap-1.5 flex-1 min-h-0 ${isCompact ? 'my-1' : 'my-2.5'}`}>
+        {/* Left Column: Product Title (Top) + Carreg até & Giant Black Date Box (Bottom) */}
+        <div className="flex-1 flex flex-col justify-between min-w-0 pr-1">
+          {/* Product Code & Description */}
+          <div 
+            style={{
+              fontSize: `${labelConfig.productTitleSize * scale}px`,
+              fontWeight: labelConfig.productTitleBold ? 900 : 700
             }}
-            className="font-black font-mono tracking-wider leading-none"
+            className={`text-center uppercase text-black tracking-tight leading-none px-0.5 truncate ${
+              isCompact ? 'py-1' : variant === 'a4_double' ? 'my-2 text-2xl' : 'my-3 text-3xl'
+            }`}
           >
-            {carregAteDate}
-          </span>
+            <span className="font-mono font-black text-black tracking-normal">{item.productCode}</span> – {item.description}
+          </div>
+
+          {/* Carreg até: + Giant Black Box - Expanded to fill the full vertical area (red box) */}
+          <div className="flex items-stretch justify-between gap-1.5 flex-1 min-h-0 my-0.5">
+            {/* Left: Carreg até: Centered both horizontally and vertically */}
+            <div 
+              className={`text-center flex flex-col items-center justify-center leading-tight shrink-0 px-1 ${isCompact ? 'min-w-[50px]' : 'min-w-[90px]'}`}
+            >
+              <span 
+                style={{ fontSize: `${labelConfig.carregAteLabelSize * scale}px` }}
+                className="font-black uppercase text-black leading-none text-center"
+              >
+                Carreg
+              </span>
+              <span 
+                style={{ fontSize: `${labelConfig.carregAteLabelSize * scale}px` }}
+                className="font-black uppercase text-black leading-none text-center mt-0.5"
+              >
+                até:
+              </span>
+            </div>
+
+            {/* Center/Right: Giant Box with Load Until Date */}
+            <div 
+              style={{
+                backgroundColor: labelConfig.carregAteBgColor,
+                color: labelConfig.carregAteTextColor,
+                border: labelConfig.highlightCarregAteBorder ? '2px solid #16a34a' : 'none',
+                minHeight: labelConfig.carregAteBoxHeight ? `${labelConfig.carregAteBoxHeight * scale}px` : undefined,
+                paddingTop: `${Math.max(2, (labelConfig.carregAteBoxHeight ? labelConfig.carregAteBoxHeight * 0.12 : 4) * scale)}px`,
+                paddingBottom: `${Math.max(2, (labelConfig.carregAteBoxHeight ? labelConfig.carregAteBoxHeight * 0.12 : 4) * scale)}px`
+              }}
+              className={`flex-1 text-center flex items-center justify-center h-full ${isCompact ? 'px-2' : 'px-4'}`}
+            >
+              <span 
+                style={{ 
+                  fontSize: `${labelConfig.carregAteDateSize * scale}px`,
+                  color: labelConfig.carregAteTextColor
+                }}
+                className="font-black italic font-mono tracking-wider leading-none"
+              >
+                {carregAteDate}
+              </span>
+            </div>
+          </div>
         </div>
 
-        {/* Right: Curva Box */}
+        {/* Right Column: CURVA Box (Spans from top of Product row to bottom of Carreg até row) */}
         {labelConfig.showCurva && (
           <div 
             style={{
               border: `${labelConfig.innerBorderWidth * scale}px solid ${labelConfig.innerBorderColor}`
             }}
-            className={`flex flex-col items-center justify-between shrink-0 text-center overflow-hidden bg-black ${isCompact ? 'min-w-[56px] sm:min-w-[62px]' : 'min-w-[110px]'}`}
+            className={`flex flex-col items-center justify-between shrink-0 text-center overflow-hidden bg-black ${isCompact ? 'w-[74px] sm:w-[86px]' : 'w-[125px]'}`}
           >
+            {/* Top Cell: CURVA (height aligns with Product title row) */}
             <div 
               style={{
                 fontSize: `${labelConfig.curvaLabelSize * scale}px`,
                 borderBottom: `${labelConfig.innerBorderWidth * scale}px solid ${labelConfig.innerBorderColor}`
               }}
-              className="bg-white text-black font-black tracking-wider w-full text-center py-0.2 leading-none"
+              className="bg-white text-black font-black tracking-wider w-full text-center py-1 leading-none shrink-0"
             >
               CURVA
             </div>
+            {/* Bottom Cell: Solid Black Box with Letter (height aligns with Carreg até black box) */}
             <div 
               style={{
                 fontSize: `${labelConfig.curvaLetterSize * scale}px`
               }}
-              className="w-full flex-1 bg-black text-white font-black flex items-center justify-center font-mono py-0.2 leading-none"
+              className="w-full flex-1 bg-black text-white font-black flex items-center justify-center font-sans leading-none"
             >
               {item.abcClass || 'B'}
             </div>
@@ -260,15 +268,15 @@ export const NRILabelCard: React.FC<NRILabelCardProps> = ({
         )}
       </div>
 
-      {/* 4. SUB-DATES: Pré-bloq, Recebimento & VALIDADE MAXIMIZADA EM NEGRITO */}
+      {/* 4. SUB-DATES: Pré-bloq & VALIDADE (Clean bold matching A4 sheet) */}
       <div 
         style={{
           borderTop: `${labelConfig.innerBorderWidth * scale}px solid ${labelConfig.innerBorderColor}`,
           borderBottom: `${labelConfig.innerBorderWidth * scale}px solid ${labelConfig.innerBorderColor}`
         }}
-        className={`flex items-center justify-between px-1 bg-slate-50 ${isCompact ? 'py-0.5 my-0.5' : 'py-2 my-2'}`}
+        className={`flex items-center justify-between px-2 bg-white ${isCompact ? 'py-1 my-0.5' : 'py-2 my-2'}`}
       >
-        <div className="flex items-center gap-2 sm:gap-3">
+        <div className="flex items-center gap-2">
           {labelConfig.showPreBloq && (
             <div>
               <span 
@@ -285,22 +293,6 @@ export const NRILabelCard: React.FC<NRILabelCardProps> = ({
               </span>
             </div>
           )}
-          {labelConfig.showReceb && (
-            <div>
-              <span 
-                style={{ fontSize: `${labelConfig.recebTextSize * scale}px` }}
-                className="font-black text-black uppercase"
-              >
-                Receb.:
-              </span>{' '}
-              <span 
-                style={{ fontSize: `${labelConfig.recebDateSize * scale}px` }}
-                className="font-mono font-black text-black"
-              >
-                {recebDate}
-              </span>
-            </div>
-          )}
         </div>
 
         {labelConfig.showValidity && (
@@ -313,7 +305,7 @@ export const NRILabelCard: React.FC<NRILabelCardProps> = ({
             </span>{' '}
             <span 
               style={{ fontSize: `${labelConfig.validityDateSize * scale}px` }}
-              className="font-mono font-black text-black underline decoration-[2px] leading-none"
+              className="font-mono font-black text-black leading-none"
             >
               {validadeDate}
             </span>

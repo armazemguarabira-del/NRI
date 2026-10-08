@@ -11,9 +11,13 @@ interface State {
   error: Error | null;
 }
 
-export class ErrorBoundary extends Component<Props, State> {
+export class ErrorBoundary extends (Component as any)<Props, State> {
+  props: Props;
+  state: State;
+
   constructor(props: Props) {
     super(props);
+    this.props = props;
     this.state = {
       hasError: false,
       error: null,

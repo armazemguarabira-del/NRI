@@ -351,278 +351,290 @@ export const InteractiveLabelPreview: React.FC<InteractiveLabelPreviewProps> = (
           </div>
         </div>
 
-        {/* 2. PRODUCT CODE & DESCRIPTION (INTERACTIVE ELEMENT 2) */}
-        <div 
-          onClick={() => setActiveElement('product_title')}
-          style={{
-            fontSize: `${labelConfig.productTitleSize * scale}px`,
-            fontWeight: labelConfig.productTitleBold ? 900 : 700
-          }}
-          className={`relative group text-center uppercase text-black tracking-tight leading-tight px-1 py-1 my-1 rounded-lg transition-all cursor-pointer ${
-            activeElement === 'product_title' 
-              ? 'ring-2 ring-purple-600 bg-purple-50/50 -m-0.5' 
-              : 'hover:ring-1 hover:ring-purple-300 hover:bg-slate-50/60'
-          }`}
-        >
-          {/* Top floating badge for Product Title */}
-          <div className="absolute -top-3.5 left-1/2 -translate-x-1/2 z-20 flex items-center gap-1.5 bg-purple-700 text-white text-[10px] font-black px-2 py-0.5 rounded-md shadow-md">
-            <Type className="w-3 h-3" />
-            <span>Nome do Produto: {labelConfig.productTitleSize}px</span>
-            <div className="flex items-center gap-0.5 ml-1 bg-black/20 px-1 rounded">
-              <button
-                type="button"
-                onMouseDown={() => startHold(() => {
-                  onUpdateProp('productTitleSize', Math.max(10, labelConfig.productTitleSize - 0.5));
-                })}
-                onMouseUp={stopHold}
-                onMouseLeave={stopHold}
-                className="hover:bg-white/30 px-1 rounded cursor-pointer"
-                title="Diminuir Nome do Produto"
-              >
-                <Minus className="w-2.5 h-2.5" />
-              </button>
-              <button
-                type="button"
-                onMouseDown={() => startHold(() => {
-                  onUpdateProp('productTitleSize', Math.min(26, labelConfig.productTitleSize + 0.5));
-                })}
-                onMouseUp={stopHold}
-                onMouseLeave={stopHold}
-                className="hover:bg-white/30 px-1 rounded cursor-pointer"
-                title="Aumentar Nome do Produto"
-              >
-                <Plus className="w-2.5 h-2.5" />
-              </button>
-            </div>
-          </div>
-
-          <span className="font-mono font-black text-black tracking-normal">{item.productCode}</span> – {item.description}
-
-          {/* Drag handle for Product Title */}
-          <div
-            onMouseDown={(e) => {
-              e.stopPropagation();
-              dragStartRef.current = {
-                target: 'product_title',
-                startX: e.clientX,
-                startY: e.clientY,
-                initialValue: labelConfig.productTitleSize
-              };
-              setDraggingTarget('product_title');
-            }}
-            onTouchStart={(e) => {
-              if (e.touches[0]) {
-                dragStartRef.current = {
-                  target: 'product_title',
-                  startX: e.touches[0].clientX,
-                  startY: e.touches[0].clientY,
-                  initialValue: labelConfig.productTitleSize
-                };
-                setDraggingTarget('product_title');
-              }
-            }}
-            className="absolute bottom-0 right-1 translate-y-1.5 z-30 bg-purple-600 text-white w-5 h-5 rounded-full flex items-center justify-center cursor-nwse-resize shadow-lg hover:scale-125 transition-transform"
-            title="Clique, segure e arraste para aumentar ou diminuir o nome do produto"
-          >
-            <Move className="w-2.5 h-2.5" />
-          </div>
-        </div>
-
-        {/* 3. HERO SECTION: "Carreg até:" + GIANT BLACK BOX + CURVA ABC (INTERACTIVE ELEMENT 3) */}
-        <div 
-          onClick={() => setActiveElement('carreg_ate')}
-          className={`relative group flex items-stretch justify-between gap-1.5 my-2 p-1 rounded-xl transition-all cursor-pointer ${
-            activeElement === 'carreg_ate' 
-              ? 'ring-2 ring-amber-500 bg-amber-50/40 -m-1' 
-              : 'hover:ring-1 hover:ring-amber-300'
-          }`}
-        >
-          {/* Top floating control badge for Carregar Até */}
-          <div className="absolute -top-4 left-3 z-20 flex items-center gap-2 bg-amber-600 text-white text-[10px] font-black px-2.5 py-0.5 rounded-md shadow-md">
-            <Calendar className="w-3 h-3" />
-            <span>Faixa Preta Carregar Até:</span>
-            <div className="flex items-center gap-1 bg-black/20 px-1.5 py-0.5 rounded">
-              <span>Data: {labelConfig.carregAteDateSize}px</span>
-              <button
-                type="button"
-                onMouseDown={() => startHold(() => {
-                  onUpdateProp('carregAteDateSize', Math.max(16, labelConfig.carregAteDateSize - 1));
-                })}
-                onMouseUp={stopHold}
-                onMouseLeave={stopHold}
-                className="hover:bg-white/30 px-1 rounded cursor-pointer"
-                title="Diminuir Data"
-              >
-                <Minus className="w-2.5 h-2.5" />
-              </button>
-              <button
-                type="button"
-                onMouseDown={() => startHold(() => {
-                  onUpdateProp('carregAteDateSize', Math.min(38, labelConfig.carregAteDateSize + 1));
-                })}
-                onMouseUp={stopHold}
-                onMouseLeave={stopHold}
-                className="hover:bg-white/30 px-1 rounded cursor-pointer"
-                title="Aumentar Data"
-              >
-                <Plus className="w-2.5 h-2.5" />
-              </button>
-            </div>
-            <div className="flex items-center gap-1 bg-black/20 px-1.5 py-0.5 rounded">
-              <span>Altura: {carregAteHeight}px</span>
-              <button
-                type="button"
-                onMouseDown={() => startHold(() => {
-                  onUpdateProp('carregAteBoxHeight', Math.max(18, carregAteHeight - 1));
-                })}
-                onMouseUp={stopHold}
-                onMouseLeave={stopHold}
-                className="hover:bg-white/30 px-1 rounded cursor-pointer"
-                title="Diminuir Altura da Barra Preta"
-              >
-                <Minus className="w-2.5 h-2.5" />
-              </button>
-              <button
-                type="button"
-                onMouseDown={() => startHold(() => {
-                  onUpdateProp('carregAteBoxHeight', Math.min(48, carregAteHeight + 1));
-                })}
-                onMouseUp={stopHold}
-                onMouseLeave={stopHold}
-                className="hover:bg-white/30 px-1 rounded cursor-pointer"
-                title="Aumentar Altura da Barra Preta"
-              >
-                <Plus className="w-2.5 h-2.5" />
-              </button>
-            </div>
-          </div>
-
-          {/* Left: Carreg até: */}
-          <div 
-            className="text-right flex flex-col justify-center leading-tight shrink-0 pr-1.5 min-w-[55px]"
-          >
-            <span 
-              style={{ fontSize: `${labelConfig.carregAteLabelSize * scale}px` }}
-              className="font-black uppercase text-black leading-none"
-            >
-              Carreg
-            </span>
-            <span 
-              style={{ fontSize: `${labelConfig.carregAteLabelSize * scale}px` }}
-              className="font-black uppercase text-black leading-none"
-            >
-              até:
-            </span>
-          </div>
-
-          {/* Center: Giant Box with Load Until Date */}
-          <div 
-            style={{
-              backgroundColor: labelConfig.carregAteBgColor,
-              color: labelConfig.carregAteTextColor,
-              border: labelConfig.highlightCarregAteBorder ? '2px solid #16a34a' : 'none',
-              minHeight: `${carregAteHeight * scale}px`,
-              paddingTop: `${Math.max(2, carregAteHeight * 0.12 * scale)}px`,
-              paddingBottom: `${Math.max(2, carregAteHeight * 0.12 * scale)}px`
-            }}
-            className="flex-1 text-center flex items-center justify-center px-3 relative shadow-inner"
-          >
-            <span 
-              style={{ 
-                fontSize: `${labelConfig.carregAteDateSize * scale}px`,
-                color: labelConfig.carregAteTextColor
+        {/* 2. MIDDLE HERO SECTION: Product + Carreg até on Left, CURVA Box spanning right */}
+        <div className="flex items-stretch justify-between gap-2 my-2 flex-1 min-h-0">
+          
+          {/* Left Column: Product Title (Top) + Carreg até & Giant Black Date Box (Bottom) */}
+          <div className="flex-1 flex flex-col justify-between min-w-0 pr-1 gap-2">
+            
+            {/* 2.1 PRODUCT CODE & DESCRIPTION (INTERACTIVE ELEMENT 2) */}
+            <div 
+              onClick={() => setActiveElement('product_title')}
+              style={{
+                fontSize: `${labelConfig.productTitleSize * scale}px`,
+                fontWeight: labelConfig.productTitleBold ? 900 : 700
               }}
-              className="font-black font-mono tracking-wider leading-none"
+              className={`relative group text-center uppercase text-black tracking-tight leading-tight px-1 py-1 rounded-lg transition-all cursor-pointer ${
+                activeElement === 'product_title' 
+                  ? 'ring-2 ring-purple-600 bg-purple-50/50' 
+                  : 'hover:ring-1 hover:ring-purple-300 hover:bg-slate-50/60'
+              }`}
             >
-              {carregAteDate}
-            </span>
+              {/* Top floating badge for Product Title */}
+              <div className="absolute -top-3.5 left-1/2 -translate-x-1/2 z-20 flex items-center gap-1.5 bg-purple-700 text-white text-[10px] font-black px-2 py-0.5 rounded-md shadow-md">
+                <Type className="w-3 h-3" />
+                <span>Nome do Produto: {labelConfig.productTitleSize}px</span>
+                <div className="flex items-center gap-0.5 ml-1 bg-black/20 px-1 rounded">
+                  <button
+                    type="button"
+                    onMouseDown={() => startHold(() => {
+                      onUpdateProp('productTitleSize', Math.max(10, labelConfig.productTitleSize - 0.5));
+                    })}
+                    onMouseUp={stopHold}
+                    onMouseLeave={stopHold}
+                    className="hover:bg-white/30 px-1 rounded cursor-pointer"
+                    title="Diminuir Nome do Produto"
+                  >
+                    <Minus className="w-2.5 h-2.5" />
+                  </button>
+                  <button
+                    type="button"
+                    onMouseDown={() => startHold(() => {
+                      onUpdateProp('productTitleSize', Math.min(26, labelConfig.productTitleSize + 0.5));
+                    })}
+                    onMouseUp={stopHold}
+                    onMouseLeave={stopHold}
+                    className="hover:bg-white/30 px-1 rounded cursor-pointer"
+                    title="Aumentar Nome do Produto"
+                  >
+                    <Plus className="w-2.5 h-2.5" />
+                  </button>
+                </div>
+              </div>
 
-            {/* Bottom Drag Handle for Black Box Height */}
-            <div
-              onMouseDown={(e) => {
-                e.stopPropagation();
-                dragStartRef.current = {
-                  target: 'black_box_height',
-                  startX: e.clientX,
-                  startY: e.clientY,
-                  initialValue: carregAteHeight
-                };
-                setDraggingTarget('black_box_height');
-              }}
-              onTouchStart={(e) => {
-                if (e.touches[0]) {
+              <span className="font-mono font-black text-black tracking-normal">{item.productCode}</span> – {item.description}
+
+              {/* Drag handle for Product Title */}
+              <div
+                onMouseDown={(e) => {
+                  e.stopPropagation();
                   dragStartRef.current = {
-                    target: 'black_box_height',
-                    startX: e.touches[0].clientX,
-                    startY: e.touches[0].clientY,
-                    initialValue: carregAteHeight
+                    target: 'product_title',
+                    startX: e.clientX,
+                    startY: e.clientY,
+                    initialValue: labelConfig.productTitleSize
                   };
-                  setDraggingTarget('black_box_height');
-                }
-              }}
-              className="absolute -bottom-2 left-1/2 -translate-x-1/2 z-30 bg-amber-500 hover:bg-amber-400 text-slate-950 px-2 py-0.5 rounded-full text-[9px] font-black flex items-center gap-1 cursor-ns-resize shadow-md hover:scale-110 transition-transform"
-              title="Clique e arraste para cima/baixo para mudar a altura da faixa preta"
-            >
-              <span>↕ Altura</span>
+                  setDraggingTarget('product_title');
+                }}
+                onTouchStart={(e) => {
+                  if (e.touches[0]) {
+                    dragStartRef.current = {
+                      target: 'product_title',
+                      startX: e.touches[0].clientX,
+                      startY: e.touches[0].clientY,
+                      initialValue: labelConfig.productTitleSize
+                    };
+                    setDraggingTarget('product_title');
+                  }
+                }}
+                className="absolute bottom-0 right-1 translate-y-1.5 z-30 bg-purple-600 text-white w-5 h-5 rounded-full flex items-center justify-center cursor-nwse-resize shadow-lg hover:scale-125 transition-transform"
+                title="Clique, segure e arraste para aumentar ou diminuir o nome do produto"
+              >
+                <Move className="w-2.5 h-2.5" />
+              </div>
             </div>
 
-            {/* Corner Drag Handle for Date Font Size */}
-            <div
-              onMouseDown={(e) => {
-                e.stopPropagation();
-                dragStartRef.current = {
-                  target: 'black_box_date',
-                  startX: e.clientX,
-                  startY: e.clientY,
-                  initialValue: labelConfig.carregAteDateSize
-                };
-                setDraggingTarget('black_box_date');
-              }}
-              onTouchStart={(e) => {
-                if (e.touches[0]) {
-                  dragStartRef.current = {
-                    target: 'black_box_date',
-                    startX: e.touches[0].clientX,
-                    startY: e.touches[0].clientY,
-                    initialValue: labelConfig.carregAteDateSize
-                  };
-                  setDraggingTarget('black_box_date');
-                }
-              }}
-              className="absolute bottom-0 right-0 translate-x-1.5 translate-y-1.5 z-30 bg-amber-500 text-slate-950 w-5 h-5 rounded-full flex items-center justify-center cursor-nwse-resize shadow-lg hover:scale-125 transition-transform"
-              title="Clique, segure e arraste para aumentar a data de giro"
+            {/* 2.2 HERO SECTION: "Carreg até:" + GIANT BLACK BOX (INTERACTIVE ELEMENT 3) */}
+            <div 
+              onClick={() => setActiveElement('carreg_ate')}
+              className={`relative group flex items-stretch justify-between gap-1.5 flex-1 min-h-0 p-1 rounded-xl transition-all cursor-pointer ${
+                activeElement === 'carreg_ate' 
+                  ? 'ring-2 ring-amber-500 bg-amber-50/40' 
+                  : 'hover:ring-1 hover:ring-amber-300'
+              }`}
             >
-              <Move className="w-2.5 h-2.5" />
+              {/* Top floating control badge for Carregar Até */}
+              <div className="absolute -top-4 left-3 z-20 flex items-center gap-2 bg-amber-600 text-white text-[10px] font-black px-2.5 py-0.5 rounded-md shadow-md">
+                <Calendar className="w-3 h-3" />
+                <span>Faixa Preta Carregar Até:</span>
+                <div className="flex items-center gap-1 bg-black/20 px-1.5 py-0.5 rounded">
+                  <span>Data: {labelConfig.carregAteDateSize}px</span>
+                  <button
+                    type="button"
+                    onMouseDown={() => startHold(() => {
+                      onUpdateProp('carregAteDateSize', Math.max(16, labelConfig.carregAteDateSize - 1));
+                    })}
+                    onMouseUp={stopHold}
+                    onMouseLeave={stopHold}
+                    className="hover:bg-white/30 px-1 rounded cursor-pointer"
+                    title="Diminuir Data"
+                  >
+                    <Minus className="w-2.5 h-2.5" />
+                  </button>
+                  <button
+                    type="button"
+                    onMouseDown={() => startHold(() => {
+                      onUpdateProp('carregAteDateSize', Math.min(38, labelConfig.carregAteDateSize + 1));
+                    })}
+                    onMouseUp={stopHold}
+                    onMouseLeave={stopHold}
+                    className="hover:bg-white/30 px-1 rounded cursor-pointer"
+                    title="Aumentar Data"
+                  >
+                    <Plus className="w-2.5 h-2.5" />
+                  </button>
+                </div>
+                <div className="flex items-center gap-1 bg-black/20 px-1.5 py-0.5 rounded">
+                  <span>Altura: {carregAteHeight}px</span>
+                  <button
+                    type="button"
+                    onMouseDown={() => startHold(() => {
+                      onUpdateProp('carregAteBoxHeight', Math.max(18, carregAteHeight - 1));
+                    })}
+                    onMouseUp={stopHold}
+                    onMouseLeave={stopHold}
+                    className="hover:bg-white/30 px-1 rounded cursor-pointer"
+                    title="Diminuir Altura da Barra Preta"
+                  >
+                    <Minus className="w-2.5 h-2.5" />
+                  </button>
+                  <button
+                    type="button"
+                    onMouseDown={() => startHold(() => {
+                      onUpdateProp('carregAteBoxHeight', Math.min(48, carregAteHeight + 1));
+                    })}
+                    onMouseUp={stopHold}
+                    onMouseLeave={stopHold}
+                    className="hover:bg-white/30 px-1 rounded cursor-pointer"
+                    title="Aumentar Altura da Barra Preta"
+                  >
+                    <Plus className="w-2.5 h-2.5" />
+                  </button>
+                </div>
+              </div>
+
+              {/* Left: Carreg até: Centered horizontally and vertically */}
+              <div 
+                className="text-center flex flex-col items-center justify-center leading-tight shrink-0 px-1.5 min-w-[55px]"
+              >
+                <span 
+                  style={{ fontSize: `${labelConfig.carregAteLabelSize * scale}px` }}
+                  className="font-black uppercase text-black leading-none text-center"
+                >
+                  Carreg
+                </span>
+                <span 
+                  style={{ fontSize: `${labelConfig.carregAteLabelSize * scale}px` }}
+                  className="font-black uppercase text-black leading-none text-center mt-0.5"
+                >
+                  até:
+                </span>
+              </div>
+
+              {/* Center: Giant Box with Load Until Date */}
+              <div 
+                style={{
+                  backgroundColor: labelConfig.carregAteBgColor,
+                  color: labelConfig.carregAteTextColor,
+                  border: labelConfig.highlightCarregAteBorder ? '2px solid #16a34a' : 'none',
+                  minHeight: `${carregAteHeight * scale}px`,
+                  paddingTop: `${Math.max(2, carregAteHeight * 0.12 * scale)}px`,
+                  paddingBottom: `${Math.max(2, carregAteHeight * 0.12 * scale)}px`
+                }}
+                className="flex-1 text-center flex items-center justify-center px-3 relative shadow-inner h-full"
+              >
+                <span 
+                  style={{ 
+                    fontSize: `${labelConfig.carregAteDateSize * scale}px`,
+                    color: labelConfig.carregAteTextColor
+                  }}
+                  className="font-black italic font-mono tracking-wider leading-none"
+                >
+                  {carregAteDate}
+                </span>
+
+                {/* Bottom Drag Handle for Black Box Height */}
+                <div
+                  onMouseDown={(e) => {
+                    e.stopPropagation();
+                    dragStartRef.current = {
+                      target: 'black_box_height',
+                      startX: e.clientX,
+                      startY: e.clientY,
+                      initialValue: carregAteHeight
+                    };
+                    setDraggingTarget('black_box_height');
+                  }}
+                  onTouchStart={(e) => {
+                    if (e.touches[0]) {
+                      dragStartRef.current = {
+                        target: 'black_box_height',
+                        startX: e.touches[0].clientX,
+                        startY: e.touches[0].clientY,
+                        initialValue: carregAteHeight
+                      };
+                      setDraggingTarget('black_box_height');
+                    }
+                  }}
+                  className="absolute -bottom-2 left-1/2 -translate-x-1/2 z-30 bg-amber-500 hover:bg-amber-400 text-slate-950 px-2 py-0.5 rounded-full text-[9px] font-black flex items-center gap-1 cursor-ns-resize shadow-md hover:scale-110 transition-transform"
+                  title="Clique e arraste para cima/baixo para mudar a altura da faixa preta"
+                >
+                  <span>↕ Altura</span>
+                </div>
+
+                {/* Corner Drag Handle for Date Font Size */}
+                <div
+                  onMouseDown={(e) => {
+                    e.stopPropagation();
+                    dragStartRef.current = {
+                      target: 'black_box_date',
+                      startX: e.clientX,
+                      startY: e.clientY,
+                      initialValue: labelConfig.carregAteDateSize
+                    };
+                    setDraggingTarget('black_box_date');
+                  }}
+                  onTouchStart={(e) => {
+                    if (e.touches[0]) {
+                      dragStartRef.current = {
+                        target: 'black_box_date',
+                        startX: e.touches[0].clientX,
+                        startY: e.touches[0].clientY,
+                        initialValue: labelConfig.carregAteDateSize
+                      };
+                      setDraggingTarget('black_box_date');
+                    }
+                  }}
+                  className="absolute bottom-0 right-0 translate-x-1.5 translate-y-1.5 z-30 bg-amber-500 text-slate-950 w-5 h-5 rounded-full flex items-center justify-center cursor-nwse-resize shadow-lg hover:scale-125 transition-transform"
+                  title="Clique, segure e arraste para aumentar a data de giro"
+                >
+                  <Move className="w-2.5 h-2.5" />
+                </div>
+              </div>
             </div>
+
           </div>
 
-          {/* Right: Curva Box */}
+          {/* Right Column: CURVA Box (Spans from top of Product row to bottom of Carreg até row) */}
           {labelConfig.showCurva && (
             <div 
               style={{
                 border: `${labelConfig.innerBorderWidth * scale}px solid ${labelConfig.innerBorderColor}`
               }}
-              className="flex flex-col items-center justify-between shrink-0 text-center overflow-hidden bg-black min-w-[70px]"
+              className="flex flex-col items-center justify-between shrink-0 text-center overflow-hidden bg-black w-[80px] sm:w-[96px]"
             >
+              {/* Top Cell: CURVA (height aligns with Product title row) */}
               <div 
                 style={{
                   fontSize: `${labelConfig.curvaLabelSize * scale}px`,
                   borderBottom: `${labelConfig.innerBorderWidth * scale}px solid ${labelConfig.innerBorderColor}`
                 }}
-                className="bg-white text-black font-black tracking-wider w-full text-center py-0.5 leading-none"
+                className="bg-white text-black font-black tracking-wider w-full text-center py-1 leading-none shrink-0"
               >
                 CURVA
               </div>
+              {/* Bottom Cell: Solid Black Box with Letter (height aligns with Carreg até black box) */}
               <div 
                 style={{
                   fontSize: `${labelConfig.curvaLetterSize * scale}px`
                 }}
-                className="w-full flex-1 bg-black text-white font-black flex items-center justify-center font-mono py-0.5 leading-none"
+                className="w-full flex-1 bg-black text-white font-black flex items-center justify-center font-sans leading-none"
               >
                 {item.abcClass || 'B'}
               </div>
             </div>
           )}
+
         </div>
 
         {/* 4. SUB-DATES: Pré-bloq, Recebimento & VALIDADE */}
